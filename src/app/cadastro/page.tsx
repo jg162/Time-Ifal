@@ -1,12 +1,14 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { Zap, Lock, Mail, User, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Zap, Lock, Mail, User, ArrowRight, AlertCircle, CheckCircle2, Users } from 'lucide-react';
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const teamCode = searchParams.get('team');
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -14,6 +16,24 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Team invite info
+  const [invitedTeam, setInvitedTeam] = useState<{ name: string; code: string } | null>(null);
+  const [teamLookupDone, setTeamLookupDone] = useState(false);
+
+  useEffect(() => {
+    if (!teamCode) {
+      setTeamLookupDone(true);
+      return;
+    }
+    fetch(`/api/teams?code=${encodeURIComponent(teamCode)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.team) setInvitedTeam({ name: data.team.name, code: data.team.code });
+      })
+      .catch(() => {})
+      .finally(() => setTeamLookupDone(true));
+  }, [teamCode]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,7 +55,13 @@ export default function RegisterPage() {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, confirmPassword }),
+        body: JSON.stringify({
+          name,
+          email,
+          password,
+          confirmPassword,
+          teamCode: invitedTeam?.code || undefined,
+        }),
       });
 
       let data: any = {};
@@ -95,6 +121,22 @@ export default function RegisterPage() {
             Cadastre seu perfil para registrar e monitorar suas avaliações físicas
           </p>
         </div>
+
+        {/* Team Invite Banner */}
+        {teamCode && invitedTeam && (
+          <div className="mb-5 p-4 rounded-2xl bg-emerald-950/50 border border-emerald-500/40 flex items-start gap-3">
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <Users className="w-4 h-4 text-emerald-400" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-emerald-300 uppercase tracking-wider mb-0.5">Convite de Time</p>
+              <p className="text-sm text-white font-semibold">{invitedTeam.name}</p>
+              <p className="text-[11px] text-gray-400 mt-0.5">
+                Ao criar sua conta, você entrará automaticamente neste time.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Card Form */}
         <div className="athletic-card rounded-3xl p-7 sm:p-8 border border-emerald-950/80 shadow-2xl">
@@ -192,7 +234,7 @@ export default function RegisterPage() {
               disabled={loading}
               className="w-full py-3.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-sm tracking-wider uppercase shadow-neon hover:shadow-neon-strong transition-all flex items-center justify-center gap-2 disabled:opacity-50 mt-4"
             >
-              <span>{loading ? 'Criando Conta...' : 'Cadastrar Atleta'}</span>
+              <span>{loading ? 'Criando Conta...' : invitedTeam ? `Cadastrar e Entrar no ${invitedTeam.name}` : 'Cadastrar Atleta'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
@@ -208,5 +250,17 @@ export default function RegisterPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#070908] flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <RegisterForm />
+    </Suspense>
   );
 }

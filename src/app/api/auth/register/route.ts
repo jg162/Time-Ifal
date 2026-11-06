@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserByEmail, createUser } from '@/lib/db';
+import { getUserByEmail, createUser, getTeamByCode, addUserToTeam } from '@/lib/db';
 import { hashPassword, signToken, setAuthCookie } from '@/lib/auth';
 import { ensureSeedData } from '@/lib/seed';
 
@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
   try {
     await ensureSeedData();
     const body = await request.json();
-    const { name, email, password, confirmPassword } = body;
+    const { name, email, password, confirmPassword, teamCode } = body;
 
     if (!name || !email || !password) {
       return NextResponse.json(
@@ -57,6 +57,19 @@ export async function POST(request: NextRequest) {
       avatar_url: `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(name)}`
     });
 
+    let joinedTeam = null;
+    if (teamCode) {
+      try {
+        const team = await getTeamByCode(teamCode);
+        if (team) {
+          await addUserToTeam(newUser.id, team.id, 'atleta');
+          joinedTeam = { id: team.id, name: team.name, code: team.code };
+        }
+      } catch (tErr) {
+        console.warn('Could not auto-add to team:', tErr);
+      }
+    }
+
     const token = signToken(newUser);
     const response = NextResponse.json({
       success: true,
@@ -66,7 +79,8 @@ export async function POST(request: NextRequest) {
         name: newUser.name,
         email: newUser.email,
         avatar_url: newUser.avatar_url,
-      }
+      },
+      team: joinedTeam
     });
 
     setAuthCookie(response, token);

@@ -14,7 +14,9 @@ import {
   Position,
   Profile,
   ServeType,
+  Team,
   TeamAthlete,
+  TeamMember,
   User,
 } from './types';
 
@@ -145,11 +147,32 @@ function initTables(db: Database.Database) {
       UNIQUE(user_id, achievement_key)
     );
 
+    CREATE TABLE IF NOT EXISTS teams (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      code TEXT UNIQUE NOT NULL,
+      description TEXT DEFAULT '',
+      created_by TEXT,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS team_members (
+      id TEXT PRIMARY KEY,
+      team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      role TEXT NOT NULL DEFAULT 'atleta',
+      joined_at TEXT NOT NULL,
+      UNIQUE(team_id, user_id)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_evaluations_user_id ON evaluations(user_id);
     CREATE INDEX IF NOT EXISTS idx_evaluations_date ON evaluations(evaluation_date);
     CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
     CREATE INDEX IF NOT EXISTS idx_goals_user_id ON goals(user_id);
     CREATE INDEX IF NOT EXISTS idx_achievements_user_id ON achievements(user_id);
+    CREATE INDEX IF NOT EXISTS idx_teams_code ON teams(code);
+    CREATE INDEX IF NOT EXISTS idx_team_members_team_id ON team_members(team_id);
+    CREATE INDEX IF NOT EXISTS idx_team_members_user_id ON team_members(user_id);
   `);
 
   // -------
@@ -161,6 +184,7 @@ function initTables(db: Database.Database) {
   addColumnIfMissing(db, 'profiles', 'show_in_rankings', 'INTEGER NOT NULL DEFAULT 1');
   addColumnIfMissing(db, 'profiles', 'public_card_enabled', 'INTEGER NOT NULL DEFAULT 0');
   addColumnIfMissing(db, 'profiles', 'public_card_slug', 'TEXT');
+  addColumnIfMissing(db, 'profiles', 'team_id', 'TEXT');
 
   addColumnIfMissing(db, 'evaluations', 'seated_height', 'REAL');
   addColumnIfMissing(db, 'evaluations', 'attack_reach', 'REAL');
@@ -510,9 +534,108 @@ export function deleteEvaluation(id: string, userId: string): boolean {
   return result.changes > 0;
 }
 
-// ----------------- TEAM HELPERS WITH PRIVACY -----------------
-export function getAllTeamAthletes(requestingUserId?: string): TeamAthlete[] {
+// ----------------- TEAMS & MEMBERS -----------------
+
+export function createTeam(name: string, description = '', createdByUserId?: string): Team {
   const db = getDatabase();
+  const id = 'team_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
+  const prefix = name.replace(/[^a-zA-Z]/g, '').substring(0, 4).toUpperCase() || 'TIME';
+  const rand = Math.floor(1000 + Math.random() * 9000);
+  const code = `${prefix}-${rand}`;
+  const now = new Date().toISOString();
+
+  db.prepare(`
+    INSERT INTO teams (id, name, code, description, created_by, created_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(id, name.trim(), code, description.trim(), createdByUserId || null, now);
+
+  if (createdByUserId) {
+    addUserToTeam(createdByUserId, id, 'capitao');
+  }
+
+  return {
+    id,
+    name: name.trim(),
+    code,
+    description: description.trim(),
+    created_by: createdByUserId || null,
+    created_at: now,
+    members_count: 1
+  };
+}
+
+export function getTeamByCode(code: string): Team | null {
+  const db = getDatabase();
+  const cleanCode = code.trim().toUpperCase();
+  const row = db.prepare('SELECT * FROM teams WHERE UPPER(code) = ?').get(cleanCode) as any;
+  if (!row) return null;
+  const countRow = db.prepare('SELECT COUNT(*) as count FROM team_members WHERE team_id = ?').get(row.id) as any;
+  return {
+    id: row.id,
+    name: row.name,
+    code: row.code,
+    description: row.description,
+    created_by: row.created_by,
+    created_at: row.created_at,
+    members_count: countRow?.count || 0
+  };
+}
+
+export function getTeamById(id: string): Team | null {
+  const db = getDatabase();
+  const row = db.prepare('SELECT * FROM teams WHERE id = ?').get(id) as any;
+  if (!row) return null;
+  const countRow = db.prepare('SELECT COUNT(*) as count FROM team_members WHERE team_id = ?').get(row.id) as any;
+  return {
+    id: row.id,
+    name: row.name,
+    code: row.code,
+    description: row.description,
+    created_by: row.created_by,
+    created_at: row.created_at,
+    members_count: countRow?.count || 0
+  };
+}
+
+export function getUserTeam(userId: string): Team | null {
+  const db = getDatabase();
+  const member = db.prepare('SELECT team_id FROM team_members WHERE user_id = ?').get(userId) as any;
+  if (member?.team_id) {
+    return getTeamById(member.team_id);
+  }
+  const prof = db.prepare('SELECT team_id FROM profiles WHERE user_id = ?').get(userId) as any;
+  if (prof?.team_id) {
+    return getTeamById(prof.team_id);
+  }
+  return null;
+}
+
+export function addUserToTeam(userId: string, teamId: string, role = 'atleta'): void {
+  const db = getDatabase();
+  const memberId = 'tm_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT OR REPLACE INTO team_members (id, team_id, user_id, role, joined_at)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(memberId, teamId, userId, role, now);
+
+  db.prepare('UPDATE profiles SET team_id = ? WHERE user_id = ?').run(teamId, userId);
+}
+
+// ----------------- TEAM HELPERS WITH PRIVACY -----------------
+export function getAllTeamAthletes(requestingUserId?: string, teamIdFilter?: string): TeamAthlete[] {
+  const db = getDatabase();
+
+  let targetTeamId = teamIdFilter;
+  if (!targetTeamId && requestingUserId) {
+    const userTeam = getUserTeam(requestingUserId);
+    targetTeamId = userTeam?.id;
+  }
+
+  // Se não foi especificado time e o usuário não pertence a nenhum, retorna vazio
+  if (!targetTeamId) {
+    return [];
+  }
 
   const query = `
     SELECT
@@ -532,13 +655,16 @@ export function getAllTeamAthletes(requestingUserId?: string): TeamAthlete[] {
       p.show_wingspan,
       p.show_goals,
       p.show_evaluations,
-      p.updated_at
-    FROM users u
+      p.updated_at,
+      tm.role as team_role
+    FROM team_members tm
+    JOIN users u ON tm.user_id = u.id
     LEFT JOIN profiles p ON u.id = p.user_id
+    WHERE tm.team_id = ?
     ORDER BY u.name ASC
   `;
 
-  const rows = db.prepare(query).all() as any[];
+  const rows = db.prepare(query).all(targetTeamId) as any[];
 
   return rows.map(row => {
     const isSelf = requestingUserId === row.id;

@@ -23,7 +23,9 @@ import {
   Position,
   Profile,
   ServeType,
+  Team,
   TeamAthlete,
+  TeamMember,
   User,
   RankingEntry,
   RankingCategory,
@@ -124,13 +126,47 @@ export async function deleteEvaluation(id: string, userId: string): Promise<bool
 }
 
 // ---------------------------------------------------------------------------
-// TEAM
+// TEAMS & INVITES
 // ---------------------------------------------------------------------------
 
-export async function getAllTeamAthletes(requestingUserId?: string): Promise<TeamAthlete[]> {
-  if (useSupabase()) return supabase.getAllTeamAthletes(requestingUserId)
+export async function createTeam(name: string, description = '', createdByUserId?: string): Promise<Team> {
+  if (useSupabase()) return supabase.createTeam(name, description, createdByUserId)
   const sql = await getSqlite()
-  return sql.getAllTeamAthletes(requestingUserId)
+  return sql.createTeam(name, description, createdByUserId)
+}
+
+export async function getTeamByCode(code: string): Promise<Team | null> {
+  if (useSupabase()) return supabase.getTeamByCode(code)
+  const sql = await getSqlite()
+  return sql.getTeamByCode(code)
+}
+
+export async function getTeamById(id: string): Promise<Team | null> {
+  if (useSupabase()) return supabase.getTeamById(id)
+  const sql = await getSqlite()
+  return sql.getTeamById(id)
+}
+
+export async function getUserTeam(userId: string): Promise<Team | null> {
+  if (useSupabase()) return supabase.getUserTeam(userId)
+  const sql = await getSqlite()
+  return sql.getUserTeam(userId)
+}
+
+export async function addUserToTeam(userId: string, teamId: string, role = 'atleta'): Promise<void> {
+  if (useSupabase()) return supabase.addUserToTeam(userId, teamId, role)
+  const sql = await getSqlite()
+  return sql.addUserToTeam(userId, teamId, role)
+}
+
+// ---------------------------------------------------------------------------
+// TEAM ATHLETES
+// ---------------------------------------------------------------------------
+
+export async function getAllTeamAthletes(requestingUserId?: string, teamIdFilter?: string): Promise<TeamAthlete[]> {
+  if (useSupabase()) return supabase.getAllTeamAthletes(requestingUserId, teamIdFilter)
+  const sql = await getSqlite()
+  return sql.getAllTeamAthletes(requestingUserId, teamIdFilter)
 }
 
 export async function getAthleteDetails(athleteId: string, requestingUserId?: string) {
@@ -267,6 +303,6 @@ export async function ensureSeedData(): Promise<void> {
 // Re-exporta tipos para compatibilidade com os módulos existentes
 export type {
   User, Profile, Evaluation, Goal, GoalStatus, GoalMetricType,
-  TeamAthlete, Position, ServeType, Achievement, AchievementKey,
+  Team, TeamMember, TeamAthlete, Position, ServeType, Achievement, AchievementKey,
   RankingEntry, RankingCategory, AthleteCardData,
 }

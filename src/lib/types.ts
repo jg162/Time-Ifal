@@ -277,6 +277,24 @@ export interface AchievementView extends AchievementDef {
   unlocked_at: string | null;
 }
 
+export interface Team {
+  id: string;
+  name: string;
+  code: string;
+  description?: string | null;
+  created_by?: string | null;
+  created_at: string;
+  members_count?: number;
+}
+
+export interface TeamMember {
+  id: string;
+  team_id: string;
+  user_id: string;
+  role: 'tecnico' | 'capitao' | 'atleta';
+  joined_at: string;
+}
+
 export interface TeamAthlete {
   id: string;
   name: string;
@@ -300,6 +318,9 @@ export interface TeamAthlete {
   last_updated?: string | null;
   evaluations_count: number;
   is_self?: boolean;
+  team_id?: string | null;
+  team_name?: string | null;
+  team_role?: string | null;
   privacy: {
     show_weight: boolean;
     show_height: boolean;
