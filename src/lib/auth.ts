@@ -1,11 +1,11 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserById } from './db';
+import { getUserById, getUserByEmail } from './db';
 import { User } from './types';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'time-ifal-super-secret-volleyball-key-2026';
-const COOKIE_NAME = 'time_ifal_token';
+const JWT_SECRET = process.env.JWT_SECRET || 'vw_perf_v3_secret_Rf8q2hC4Lz9tY6sX1bN5kA7dW3jF0mV2uQ9rT5yE8i';
+const COOKIE_NAME = 'volley_performance_token';
 
 export async function hashPassword(password: string): Promise<string> {
   const salt = await bcrypt.genSalt(10);
@@ -78,4 +78,11 @@ export async function getCurrentUserFromRequest(request: NextRequest): Promise<U
   if (!payload || !payload.id) return null;
 
   return getUserById(payload.id);
+}
+
+export async function verifyCredentials(email: string, password: string): Promise<null | User & { password_hash: string }> {
+  const user = getUserByEmail(email);
+  if (!user) return null;
+  const ok = await comparePassword(password, user.password_hash);
+  return ok ? user : null;
 }

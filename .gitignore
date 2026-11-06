@@ -34,3 +34,6 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
+
+# scratch kit separado do projeto principal
+volley-performance/

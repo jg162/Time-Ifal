@@ -1,7 +1,21 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
-import { Evaluation, Position, Profile, ServeType, TeamAthlete, User } from './types';
+import crypto from 'crypto';
+import {
+  Achievement,
+  AchievementKey,
+  AthleteCardData,
+  Evaluation,
+  Goal,
+  GoalMetricType,
+  GoalStatus,
+  Position,
+  Profile,
+  ServeType,
+  TeamAthlete,
+  User,
+} from './types';
 
 // Ensure data directory exists
 const dbDir = path.join(process.cwd(), 'data');
@@ -24,6 +38,13 @@ export function getDatabase(): Database.Database {
   return dbInstance;
 }
 
+function addColumnIfMissing(db: Database.Database, table: string, column: string, definition: string) {
+  const columns = (db.prepare(`PRAGMA table_info(${table})`).all() as any[]).map((c) => c.name);
+  if (!columns.includes(column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition};`);
+  }
+}
+
 function initTables(db: Database.Database) {
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
@@ -42,6 +63,7 @@ function initTables(db: Database.Database) {
       preferred_position TEXT NOT NULL DEFAULT 'Ponteiro',
       serve_types TEXT NOT NULL DEFAULT '[]',
       bio_goals TEXT DEFAULT '',
+      practice_time TEXT DEFAULT '',
       show_weight INTEGER NOT NULL DEFAULT 1,
       show_height INTEGER NOT NULL DEFAULT 1,
       show_reach INTEGER NOT NULL DEFAULT 1,
@@ -80,10 +102,101 @@ function initTables(db: Database.Database) {
       used INTEGER NOT NULL DEFAULT 0
     );
 
+    CREATE TABLE IF NOT EXISTS goals (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      metric_type TEXT,
+      current_value REAL,
+      target_value REAL,
+      deadline TEXT,
+      status TEXT NOT NULL DEFAULT 'ativo',
+      progress_pct REAL NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS achievements (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      achievement_key TEXT NOT NULL,
+      unlocked_at TEXT NOT NULL,
+      UNIQUE(user_id, achievement_key)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_evaluations_user_id ON evaluations(user_id);
     CREATE INDEX IF NOT EXISTS idx_evaluations_date ON evaluations(evaluation_date);
     CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+    CREATE INDEX IF NOT EXISTS idx_goals_user_id ON goals(user_id);
+    CREATE INDEX IF NOT EXISTS idx_achievements_user_id ON achievements(user_id);
   `);
+
+  // -------
+  // Idempotent migrations for tables created by older versions of the app.
+  // Existing data (users, profiles, evaluations) is always preserved.
+  // -------
+  addColumnIfMissing(db, 'profiles', 'laterality', 'TEXT');
+  addColumnIfMissing(db, 'profiles', 'practice_time', "TEXT DEFAULT ''");
+  addColumnIfMissing(db, 'profiles', 'show_in_rankings', 'INTEGER NOT NULL DEFAULT 1');
+  addColumnIfMissing(db, 'profiles', 'public_card_enabled', 'INTEGER NOT NULL DEFAULT 0');
+  addColumnIfMissing(db, 'profiles', 'public_card_slug', 'TEXT');
+
+  addColumnIfMissing(db, 'evaluations', 'seated_height', 'REAL');
+  addColumnIfMissing(db, 'evaluations', 'attack_reach', 'REAL');
+  addColumnIfMissing(db, 'evaluations', 'block_reach', 'REAL');
+  addColumnIfMissing(db, 'evaluations', 'laterality', 'TEXT');
+  addColumnIfMissing(db, 'evaluations', 'practice_time', "TEXT DEFAULT ''");
+}
+
+// ----------------- EVALUATION SERIALIZATION -----------------
+const EVAL_KEYS = [
+  'id',
+  'user_id',
+  'evaluation_date',
+  'full_name',
+  'birth_date',
+  'age',
+  'weight',
+  'height',
+  'reach_standing',
+  'reach_jumping',
+  'wingspan',
+  'seated_height',
+  'attack_reach',
+  'block_reach',
+  'laterality',
+  'practice_time',
+  'vertical_jump',
+  'bmi',
+] as const;
+
+function rowToEvaluation(r: any): Evaluation {
+  return {
+    id: r.id,
+    user_id: r.user_id,
+    evaluation_date: r.evaluation_date,
+    full_name: r.full_name,
+    birth_date: r.birth_date,
+    age: r.age,
+    weight: r.weight,
+    height: r.height,
+    reach_standing: r.reach_standing,
+    reach_jumping: r.reach_jumping,
+    wingspan: r.wingspan,
+    seated_height: r.seated_height ?? null,
+    attack_reach: r.attack_reach ?? null,
+    block_reach: r.block_reach ?? null,
+    laterality: r.laterality ?? null,
+    practice_time: r.practice_time ?? '',
+    vertical_jump: r.vertical_jump,
+    bmi: r.bmi,
+    position: r.position as Position,
+    serve_types: JSON.parse(r.serve_types || '[]'),
+    goals: r.goals,
+    notes: r.notes,
+    created_at: r.created_at,
+  };
 }
 
 // ----------------- USER HELPERS -----------------
@@ -102,18 +215,21 @@ export function getUserById(id: string): User | null {
 export function createUser(user: { id: string; email: string; password_hash: string; name: string; avatar_url?: string }): User {
   const db = getDatabase();
   const now = new Date().toISOString();
-  
+
   const insertUser = db.prepare(`
     INSERT INTO users (id, email, password_hash, name, avatar_url, created_at)
     VALUES (?, ?, ?, ?, ?, ?)
   `);
-  
+
   const insertProfile = db.prepare(`
     INSERT INTO profiles (
-      user_id, full_name, birth_date, preferred_position, serve_types, bio_goals,
-      show_weight, show_height, show_reach, show_wingspan, show_goals, show_evaluations, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, 1, 1, 1, 1, 1, 1, ?)
+      user_id, full_name, birth_date, preferred_position, serve_types, bio_goals, practice_time,
+      show_weight, show_height, show_reach, show_wingspan, show_goals, show_evaluations,
+      show_in_rankings, public_card_enabled, public_card_slug, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1, 1, 1, 1, 1, 1, 0, ?, ?)
   `);
+
+  const slug = generateCardSlug(user.name);
 
   const runTx = db.transaction(() => {
     insertUser.run(user.id, user.email.toLowerCase(), user.password_hash, user.name, user.avatar_url || null, now);
@@ -124,6 +240,8 @@ export function createUser(user: { id: string; email: string; password_hash: str
       'Ponteiro',
       JSON.stringify(['Flutuante pulando']),
       '',
+      '',
+      slug,
       now
     );
   });
@@ -139,6 +257,11 @@ export function createUser(user: { id: string; email: string; password_hash: str
   };
 }
 
+export function updateUserPassword(userId: string, passwordHash: string): void {
+  const db = getDatabase();
+  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(passwordHash, userId);
+}
+
 // ----------------- PROFILE HELPERS -----------------
 export function getProfileByUserId(userId: string): Profile | null {
   const db = getDatabase();
@@ -151,6 +274,8 @@ export function getProfileByUserId(userId: string): Profile | null {
     full_name: row.full_name,
     birth_date: row.birth_date,
     preferred_position: row.preferred_position as Position,
+    laterality: row.laterality ?? null,
+    practice_time: row.practice_time ?? '',
     serve_types: JSON.parse(row.serve_types || '[]'),
     bio_goals: row.bio_goals,
     show_weight: Boolean(row.show_weight),
@@ -159,6 +284,9 @@ export function getProfileByUserId(userId: string): Profile | null {
     show_wingspan: Boolean(row.show_wingspan),
     show_goals: Boolean(row.show_goals),
     show_evaluations: Boolean(row.show_evaluations),
+    show_in_rankings: row.show_in_rankings === undefined ? true : Boolean(row.show_in_rankings),
+    public_card_enabled: Boolean(row.public_card_enabled),
+    public_card_slug: row.public_card_slug ?? null,
     updated_at: row.updated_at
   };
 }
@@ -175,7 +303,7 @@ export function updateProfile(userId: string, data: Partial<Profile> & { name?: 
   const tx = db.transaction(() => {
     if (data.name !== undefined || data.avatar_url !== undefined) {
       db.prepare(`
-        UPDATE users 
+        UPDATE users
         SET name = COALESCE(?, name),
             avatar_url = COALESCE(?, avatar_url)
         WHERE id = ?
@@ -186,14 +314,22 @@ export function updateProfile(userId: string, data: Partial<Profile> & { name?: 
       full_name: data.full_name ?? (data.name ?? current.full_name),
       birth_date: data.birth_date !== undefined ? data.birth_date : current.birth_date,
       preferred_position: data.preferred_position ?? current.preferred_position,
+      laterality: data.laterality !== undefined ? data.laterality : current.laterality,
+      practice_time: data.practice_time !== undefined ? data.practice_time : current.practice_time,
       serve_types: data.serve_types ? JSON.stringify(data.serve_types) : JSON.stringify(current.serve_types),
       bio_goals: data.bio_goals !== undefined ? data.bio_goals : current.bio_goals,
-      show_weight: data.show_weight !== undefined ? (data.show_weight ? 1 : 0) : (current.show_weight ? 1 : 0),
-      show_height: data.show_height !== undefined ? (data.show_height ? 1 : 0) : (current.show_height ? 1 : 0),
-      show_reach: data.show_reach !== undefined ? (data.show_reach ? 1 : 0) : (current.show_reach ? 1 : 0),
-      show_wingspan: data.show_wingspan !== undefined ? (data.show_wingspan ? 1 : 0) : (current.show_wingspan ? 1 : 0),
-      show_goals: data.show_goals !== undefined ? (data.show_goals ? 1 : 0) : (current.show_goals ? 1 : 0),
-      show_evaluations: data.show_evaluations !== undefined ? (data.show_evaluations ? 1 : 0) : (current.show_evaluations ? 1 : 0),
+      show_weight: data.show_weight !== undefined ? toInt(data.show_weight) : toInt(current.show_weight),
+      show_height: data.show_height !== undefined ? toInt(data.show_height) : toInt(current.show_height),
+      show_reach: data.show_reach !== undefined ? toInt(data.show_reach) : toInt(current.show_reach),
+      show_wingspan: data.show_wingspan !== undefined ? toInt(data.show_wingspan) : toInt(current.show_wingspan),
+      show_goals: data.show_goals !== undefined ? toInt(data.show_goals) : toInt(current.show_goals),
+      show_evaluations: data.show_evaluations !== undefined ? toInt(data.show_evaluations) : toInt(current.show_evaluations),
+      show_in_rankings: data.show_in_rankings !== undefined ? toInt(data.show_in_rankings) : toInt(current.show_in_rankings),
+      public_card_enabled: data.public_card_enabled !== undefined ? toInt(data.public_card_enabled) : toInt(current.public_card_enabled),
+      public_card_slug:
+        data.public_card_slug !== undefined
+          ? data.public_card_slug
+          : (current.public_card_slug || generateCardSlug(current.full_name)),
     };
 
     db.prepare(`
@@ -201,6 +337,8 @@ export function updateProfile(userId: string, data: Partial<Profile> & { name?: 
       SET full_name = ?,
           birth_date = ?,
           preferred_position = ?,
+          laterality = ?,
+          practice_time = ?,
           serve_types = ?,
           bio_goals = ?,
           show_weight = ?,
@@ -209,12 +347,17 @@ export function updateProfile(userId: string, data: Partial<Profile> & { name?: 
           show_wingspan = ?,
           show_goals = ?,
           show_evaluations = ?,
+          show_in_rankings = ?,
+          public_card_enabled = ?,
+          public_card_slug = ?,
           updated_at = ?
       WHERE user_id = ?
     `).run(
       updated.full_name,
       updated.birth_date,
       updated.preferred_position,
+      updated.laterality,
+      updated.practice_time,
       updated.serve_types,
       updated.bio_goals,
       updated.show_weight,
@@ -223,6 +366,9 @@ export function updateProfile(userId: string, data: Partial<Profile> & { name?: 
       updated.show_wingspan,
       updated.show_goals,
       updated.show_evaluations,
+      updated.show_in_rankings,
+      updated.public_card_enabled,
+      updated.public_card_slug,
       now,
       userId
     );
@@ -230,6 +376,10 @@ export function updateProfile(userId: string, data: Partial<Profile> & { name?: 
 
   tx();
   return getProfileByUserId(userId)!;
+}
+
+function toInt(v: boolean): 1 | 0 {
+  return v ? 1 : 0;
 }
 
 // ----------------- EVALUATION HELPERS -----------------
@@ -241,9 +391,11 @@ export function createEvaluation(evalData: Omit<Evaluation, 'created_at'>): Eval
     INSERT INTO evaluations (
       id, user_id, evaluation_date, full_name, birth_date, age,
       weight, height, reach_standing, reach_jumping, wingspan,
+      seated_height, attack_reach, block_reach, laterality, practice_time,
       vertical_jump, bmi, position, serve_types, goals, notes, created_at
     ) VALUES (
       ?, ?, ?, ?, ?, ?,
+      ?, ?, ?, ?, ?,
       ?, ?, ?, ?, ?,
       ?, ?, ?, ?, ?, ?, ?
     )
@@ -261,6 +413,11 @@ export function createEvaluation(evalData: Omit<Evaluation, 'created_at'>): Eval
     evalData.reach_standing,
     evalData.reach_jumping,
     evalData.wingspan,
+    evalData.seated_height,
+    evalData.attack_reach,
+    evalData.block_reach,
+    evalData.laterality,
+    evalData.practice_time || '',
     evalData.vertical_jump,
     evalData.bmi,
     evalData.position,
@@ -270,13 +427,15 @@ export function createEvaluation(evalData: Omit<Evaluation, 'created_at'>): Eval
     now
   );
 
-  // Sync profile metadata
+  // Sync profile metadata so the TIME area and card stay consistent
   try {
     db.prepare(`
       UPDATE profiles
       SET full_name = ?,
           birth_date = ?,
           preferred_position = ?,
+          laterality = COALESCE(?, laterality),
+          practice_time = ?,
           serve_types = ?,
           bio_goals = ?,
           updated_at = ?
@@ -285,6 +444,8 @@ export function createEvaluation(evalData: Omit<Evaluation, 'created_at'>): Eval
       evalData.full_name,
       evalData.birth_date,
       evalData.position,
+      evalData.laterality,
+      evalData.practice_time || '',
       JSON.stringify(evalData.serve_types),
       evalData.goals,
       now,
@@ -303,67 +464,23 @@ export function createEvaluation(evalData: Omit<Evaluation, 'created_at'>): Eval
 export function getEvaluationsByUserId(userId: string): Evaluation[] {
   const db = getDatabase();
   const stmt = db.prepare(`
-    SELECT * FROM evaluations 
-    WHERE user_id = ? 
+    SELECT * FROM evaluations
+    WHERE user_id = ?
     ORDER BY evaluation_date ASC, created_at ASC
   `);
   const rows = stmt.all(userId) as any[];
-
-  return rows.map(r => ({
-    id: r.id,
-    user_id: r.user_id,
-    evaluation_date: r.evaluation_date,
-    full_name: r.full_name,
-    birth_date: r.birth_date,
-    age: r.age,
-    weight: r.weight,
-    height: r.height,
-    reach_standing: r.reach_standing,
-    reach_jumping: r.reach_jumping,
-    wingspan: r.wingspan,
-    vertical_jump: r.vertical_jump,
-    bmi: r.bmi,
-    position: r.position as Position,
-    serve_types: JSON.parse(r.serve_types || '[]'),
-    goals: r.goals,
-    notes: r.notes,
-    created_at: r.created_at
-  }));
+  return rows.map(rowToEvaluation);
 }
 
 export function getEvaluationById(id: string, userId?: string): Evaluation | null {
   const db = getDatabase();
-  let stmt;
   let row;
   if (userId) {
-    stmt = db.prepare('SELECT * FROM evaluations WHERE id = ? AND user_id = ?');
-    row = stmt.get(id, userId) as any;
+    row = db.prepare('SELECT * FROM evaluations WHERE id = ? AND user_id = ?').get(id, userId) as any;
   } else {
-    stmt = db.prepare('SELECT * FROM evaluations WHERE id = ?');
-    row = stmt.get(id) as any;
+    row = db.prepare('SELECT * FROM evaluations WHERE id = ?').get(id) as any;
   }
-
-  if (!row) return null;
-  return {
-    id: row.id,
-    user_id: row.user_id,
-    evaluation_date: row.evaluation_date,
-    full_name: row.full_name,
-    birth_date: row.birth_date,
-    age: row.age,
-    weight: row.weight,
-    height: row.height,
-    reach_standing: row.reach_standing,
-    reach_jumping: row.reach_jumping,
-    wingspan: row.wingspan,
-    vertical_jump: row.vertical_jump,
-    bmi: row.bmi,
-    position: row.position as Position,
-    serve_types: JSON.parse(row.serve_types || '[]'),
-    goals: row.goals,
-    notes: row.notes,
-    created_at: row.created_at
-  };
+  return row ? rowToEvaluation(row) : null;
 }
 
 export function deleteEvaluation(id: string, userId: string): boolean {
@@ -378,13 +495,15 @@ export function getAllTeamAthletes(requestingUserId?: string): TeamAthlete[] {
   const db = getDatabase();
 
   const query = `
-    SELECT 
+    SELECT
       u.id,
       u.name,
       u.avatar_url,
       p.full_name,
       p.birth_date,
       p.preferred_position,
+      p.laterality,
+      p.practice_time,
       p.serve_types,
       p.bio_goals,
       p.show_weight,
@@ -412,9 +531,9 @@ export function getAllTeamAthletes(requestingUserId?: string): TeamAthlete[] {
 
     // Get latest evaluation for this athlete
     const latestEval = db.prepare(`
-      SELECT * FROM evaluations 
-      WHERE user_id = ? 
-      ORDER BY evaluation_date DESC, created_at DESC 
+      SELECT * FROM evaluations
+      WHERE user_id = ?
+      ORDER BY evaluation_date DESC, created_at DESC
       LIMIT 1
     `).get(row.id) as any;
 
@@ -432,6 +551,7 @@ export function getAllTeamAthletes(requestingUserId?: string): TeamAthlete[] {
       name: row.full_name || row.name,
       avatar_url: row.avatar_url,
       position: (latestEval?.position || row.preferred_position || 'Ponteiro') as Position,
+      laterality: latestEval?.laterality || row.laterality || null,
       birth_date: row.birth_date || latestEval?.birth_date || null,
       age: latestEval?.age ?? null,
       height: showHeight ? (latestEval?.height ?? null) : null,
@@ -440,11 +560,15 @@ export function getAllTeamAthletes(requestingUserId?: string): TeamAthlete[] {
       reach_jumping: showReach ? (latestEval?.reach_jumping ?? null) : null,
       wingspan: showWingspan ? (latestEval?.wingspan ?? null) : null,
       vertical_jump: showReach ? (latestEval?.vertical_jump ?? null) : null,
+      attack_reach: showReach ? (latestEval?.attack_reach ?? null) : null,
+      block_reach: showReach ? (latestEval?.block_reach ?? null) : null,
       bmi: (showWeight && showHeight) ? (latestEval?.bmi ?? null) : null,
       serve_types: serveTypes,
+      practice_time: row.practice_time || latestEval?.practice_time || null,
       goals: showGoals ? (latestEval?.goals || row.bio_goals || null) : null,
       last_updated: latestEval?.evaluation_date || row.updated_at || null,
       evaluations_count: showEvaluations ? evalCount : 0,
+      is_self: isSelf,
       privacy: {
         show_weight: Boolean(row.show_weight),
         show_height: Boolean(row.show_height),
@@ -475,6 +599,8 @@ export function getAthleteDetails(athleteId: string, requestingUserId?: string) 
         reach_standing: (isSelf || athlete.privacy.show_reach) ? ev.reach_standing : 0,
         reach_jumping: (isSelf || athlete.privacy.show_reach) ? ev.reach_jumping : 0,
         vertical_jump: (isSelf || athlete.privacy.show_reach) ? ev.vertical_jump : 0,
+        attack_reach: (isSelf || athlete.privacy.show_reach) ? ev.attack_reach : null,
+        block_reach: (isSelf || athlete.privacy.show_reach) ? ev.block_reach : null,
         wingspan: (isSelf || athlete.privacy.show_wingspan) ? ev.wingspan : 0,
         bmi: (isSelf || (athlete.privacy.show_weight && athlete.privacy.show_height)) ? ev.bmi : 0,
         goals: (isSelf || athlete.privacy.show_goals) ? ev.goals : 'Informação restrita pelo atleta.',
@@ -488,12 +614,343 @@ export function getAthleteDetails(athleteId: string, requestingUserId?: string) 
   };
 }
 
+// ----------------- RANKINGS -----------------
+type RankingField = 'reach_jumping' | 'vertical_jump' | 'attack_reach' | 'block_reach' | 'height' | 'wingspan';
+
+export function getRanking(field: RankingField, limit = 100): {
+  athlete_id: string;
+  rank: number;
+  name: string;
+  avatar_url: string | null;
+  position: Position;
+  value: number;
+  evaluation_date: string;
+}[] {
+  const db = getDatabase();
+
+  const rows = db.prepare(`
+    SELECT e.*, u.avatar_url AS user_avatar_url
+    FROM evaluations e
+    JOIN users u ON u.id = e.user_id
+    WHERE e.user_id IN (
+      SELECT p.user_id FROM profiles p WHERE p.show_in_rankings = 1
+    )
+    AND e.${field} IS NOT NULL
+    ORDER BY
+      e.user_id,
+      e.evaluation_date DESC,
+      e.created_at DESC
+  `).all() as any[];
+
+  // For each athlete keep only the most recent evaluation that has this metric
+  const best = new Map<string, any>();
+  for (const r of rows) {
+    if (!best.has(r.user_id)) best.set(r.user_id, r);
+  }
+
+  const ordered = Array.from(best.entries())
+    .map(([, r]) => r)
+    .filter(r => (field === 'vertical_jump' ? r.vertical_jump > 0 : r[field] > 0))
+    .map(r => ({
+      value: field === 'vertical_jump' ? r.vertical_jump : r[field],
+      user_id: r.user_id,
+      name: r.full_name,
+      avatar_url: r.user_avatar_url,
+      position: r.position,
+      evaluation_date: r.evaluation_date,
+    }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, limit);
+
+  return ordered.map((r, i) => ({
+    athlete_id: r.user_id,
+    rank: i + 1,
+    name: r.name,
+    avatar_url: r.avatar_url,
+    position: r.position,
+    value: r.value,
+    evaluation_date: r.evaluation_date,
+  }));
+}
+
+// ----------------- GOALS -----------------
+export type GoalInput = {
+  title: string;
+  description?: string;
+  metric_type?: GoalMetricType | null;
+  current_value?: number | null;
+  target_value?: number | null;
+  deadline?: string | null;
+};
+
+function computeProgressPct(metricType: string | null, currentValue: number | null, targetValue: number | null): number {
+  if (metricType && metricType !== 'tecnica' && currentValue !== null && targetValue !== null && targetValue !== 0) {
+    const pct = (currentValue / targetValue) * 100;
+    return Math.max(0, Math.min(100, Math.round(pct)));
+  }
+  return 0;
+}
+
+export function createGoal(userId: string, input: GoalInput): Goal {
+  const db = getDatabase();
+  const now = new Date().toISOString();
+  const id = 'goal_' + crypto.randomBytes(6).toString('hex');
+
+  db.prepare(`
+    INSERT INTO goals (id, user_id, title, description, metric_type, current_value, target_value, deadline, status, progress_pct, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'ativo', ?, ?, ?)
+  `).run(
+    id,
+    userId,
+    input.title.trim(),
+    input.description?.trim() || '',
+    input.metric_type ?? null,
+    input.current_value ?? null,
+    input.target_value ?? null,
+    input.deadline ?? null,
+    computeProgressPct(input.metric_type ?? null, input.current_value ?? null, input.target_value ?? null),
+    now,
+    now
+  );
+
+  return getGoalById(id, userId)!;
+}
+
+export function getGoalById(goalId: string, userId: string): Goal | null {
+  const db = getDatabase();
+  const row = db.prepare('SELECT * FROM goals WHERE id = ? AND user_id = ?').get(goalId, userId) as any;
+  return row ? rowToGoal(row) : null;
+}
+
+function rowToGoal(r: any): Goal {
+  return {
+    id: r.id,
+    user_id: r.user_id,
+    title: r.title,
+    description: r.description,
+    metric_type: r.metric_type,
+    current_value: r.current_value,
+    target_value: r.target_value,
+    deadline: r.deadline,
+    status: r.status,
+    progress_pct: r.progress_pct,
+    created_at: r.created_at,
+    updated_at: r.updated_at,
+  };
+}
+
+export function getGoalsByUserId(userId: string): Goal[] {
+  const db = getDatabase();
+  const rows = db.prepare('SELECT * FROM goals WHERE user_id = ? ORDER BY created_at DESC').all(userId) as any[];
+  return rows.map(rowToGoal);
+}
+
+export function updateGoal(
+  goalId: string,
+  userId: string,
+  data: Partial<GoalInput> & {
+    status?: GoalStatus;
+    /** Progresso manual apenas para metas técnicas (sem métrica automática). */
+    progress_pct?: number;
+  }
+): Goal | null {
+  const db = getDatabase();
+  const existing = getGoalById(goalId, userId);
+  if (!existing) return null;
+
+  const now = new Date().toISOString();
+  const metricType = data.metric_type !== undefined ? data.metric_type : existing.metric_type;
+  const currentValue = data.current_value !== undefined ? data.current_value : existing.current_value;
+  const targetValue = data.target_value !== undefined ? data.target_value : existing.target_value;
+  const status = data.status ?? existing.status;
+
+  // Manual progress for technical goals, computed progress for measurable ones
+  const progress = status === 'concluido'
+    ? 100
+    : (data.progress_pct !== undefined && metricType === 'tecnica'
+        ? Math.max(0, Math.min(100, Math.round(data.progress_pct)))
+        : computeProgressPct(metricType, currentValue, targetValue));
+
+  db.prepare(`
+    UPDATE goals
+    SET title = ?,
+        description = ?,
+        metric_type = ?,
+        current_value = ?,
+        target_value = ?,
+        deadline = ?,
+        status = ?,
+        progress_pct = ?,
+        updated_at = ?
+    WHERE id = ? AND user_id = ?
+  `).run(
+    data.title !== undefined ? data.title.trim() : existing.title,
+    data.description !== undefined ? data.description.trim() : existing.description,
+    metricType,
+    currentValue,
+    targetValue,
+    data.deadline !== undefined ? data.deadline : existing.deadline,
+    status,
+    progress,
+    now,
+    goalId,
+    userId
+  );
+
+  return getGoalById(goalId, userId);
+}
+
+export function deleteGoal(goalId: string, userId: string): boolean {
+  const db = getDatabase();
+  const result = db.prepare('DELETE FROM goals WHERE id = ? AND user_id = ?').run(goalId, userId);
+  return result.changes > 0;
+}
+
+/**
+ * Atualiza os valores atuais de todas as metas mensuráveis de um atleta
+ * com base na sua avaliação mais recente. Chamado a cada nova avaliação.
+ */
+export function syncGoalsWithLatestEvaluation(userId: string): void {
+  const db = getDatabase();
+  const latest = db.prepare(`
+    SELECT * FROM evaluations WHERE user_id = ? ORDER BY evaluation_date DESC, created_at DESC LIMIT 1
+  `).get(userId) as any;
+  if (!latest) return;
+
+  const metricMap: Record<string, number | null> = {
+    attack_reach: latest.attack_reach,
+    block_reach: latest.block_reach,
+    vertical_jump: latest.vertical_jump,
+    reach_jumping: latest.reach_jumping,
+    wingspan: latest.wingspan,
+    height: latest.height,
+    weight: latest.weight,
+  };
+
+  const goals = db.prepare(`
+    SELECT * FROM goals WHERE user_id = ? AND status = 'ativo' AND metric_type IS NOT NULL AND metric_type != 'tecnica'
+  `).all(userId) as any[];
+
+  const now = new Date().toISOString();
+  for (const g of goals) {
+    const metricValue = metricMap[g.metric_type];
+    if (metricValue === null || metricValue === undefined) continue;
+    const progress = computeProgressPct(g.metric_type, metricValue, g.target_value);
+    db.prepare('UPDATE goals SET current_value = ?, progress_pct = ?, updated_at = ? WHERE id = ?')
+      .run(metricValue, progress, now, g.id);
+  }
+}
+
+// ----------------- ACHIEVEMENTS -----------------
+export function getAchievementsByUserId(userId: string): Achievement[] {
+  const db = getDatabase();
+  const rows = db.prepare('SELECT achievement_key, unlocked_at FROM achievements WHERE user_id = ?').all(userId) as any[];
+  return rows.map(r => ({ key: r.achievement_key as AchievementKey, unlocked_at: r.unlocked_at }));
+}
+
+export function unlockAchievements(userId: string, keys: AchievementKey[]): Achievement[] {
+  if (keys.length === 0) return [];
+  const db = getDatabase();
+  const now = new Date().toISOString();
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO achievements (id, user_id, achievement_key, unlocked_at)
+    VALUES (?, ?, ?, ?)
+  `);
+  const tx = db.transaction(() => {
+    for (const key of keys) {
+      insert.run('ach_' + crypto.randomBytes(6).toString('hex'), userId, key, now);
+    }
+  });
+  tx();
+  const unlocked = db.prepare(`
+    SELECT achievement_key, unlocked_at FROM achievements
+    WHERE user_id = ? AND achievement_key IN (${keys.map(() => '?').join(',')})
+  `).all(userId, ...keys) as any[];
+  return unlocked.map(r => ({ key: r.achievement_key as AchievementKey, unlocked_at: r.unlocked_at }));
+}
+
+// ----------------- ATLETE CARD (CARTEIRINHA) -----------------
+export function generateCardSlug(name: string): string {
+  const base = name.toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '') || 'atleta';
+  let slug = base;
+  let attempt = 0;
+  while (isCardSlugTaken(slug, null as unknown as string)) {
+    attempt += 1;
+    slug = `${base}-${attempt}`;
+    if (attempt > 20) {
+      slug = `${base}-${Math.random().toString(36).slice(2, 7)}`;
+      break;
+    }
+  }
+  return slug;
+}
+
+function isCardSlugTaken(slug: string, userId?: string): boolean {
+  const db = getDatabase();
+  const row = db.prepare('SELECT user_id FROM profiles WHERE public_card_slug = ?').get(slug) as any;
+  if (!row) return false;
+  return userId ? row.user_id !== userId : true;
+}
+
+/**
+ * Dados exclusivos para o link público da carteirinha: apenas campos
+ * que o atleta autorizou (mesmos toggles de privacidade das outras áreas).
+ */
+export function getPublicCardBySlug(slug: string): AthleteCardData | null {
+  const db = getDatabase();
+  const profileRow = db.prepare(`
+    SELECT p.*, u.name AS account_name, u.avatar_url AS account_avatar
+    FROM profiles p JOIN users u ON u.id = p.user_id
+    WHERE p.public_card_slug = ? AND p.public_card_enabled = 1
+  `).get(slug) as any;
+  if (!profileRow) return null;
+
+  const userId = profileRow.user_id;
+  const latest = db.prepare(`
+    SELECT * FROM evaluations WHERE user_id = ? ORDER BY evaluation_date DESC, created_at DESC LIMIT 1
+  `).get(userId) as any;
+
+  const birthDate = profileRow.birth_date || latest?.birth_date || null;
+  const age = birthDate ? computeAge(birthDate, latest?.evaluation_date ?? undefined) : null;
+
+  // Birth date is NEVER exposed publicly: only the derived age.
+  return {
+    id: userId,
+    slug,
+    name: profileRow.full_name || profileRow.account_name,
+    avatar_url: profileRow.account_avatar,
+    age,
+    position: (latest?.position || profileRow.preferred_position || 'Ponteiro') as Position,
+    height: profileRow.show_height ? (latest?.height ?? null) : null,
+    wingspan: profileRow.show_wingspan ? (latest?.wingspan ?? null) : null,
+    vertical_jump: profileRow.show_reach ? (latest?.vertical_jump ?? null) : null,
+    attack_reach: profileRow.show_reach ? (latest?.attack_reach ?? null) : null,
+    block_reach: profileRow.show_reach ? (latest?.block_reach ?? null) : null,
+    evaluation_date: latest?.evaluation_date ?? null,
+    unlocked_achievements: getAchievementsByUserId(userId).slice(0, 4),
+  };
+}
+
+function computeAge(birthDateStr: string, referenceDateStr?: string): number {
+  const birth = new Date(birthDateStr);
+  if (isNaN(birth.getTime())) return 0;
+  const ref = referenceDateStr ? new Date(referenceDateStr) : new Date();
+  let age = ref.getFullYear() - birth.getFullYear();
+  const m = ref.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && ref.getDate() < birth.getDate())) age--;
+  return Math.max(0, age);
+}
+
 // ----------------- PASSWORD RESETS -----------------
 export function createPasswordResetToken(email: string, code: string): void {
   const db = getDatabase();
   const id = Math.random().toString(36).substring(2) + Date.now().toString(36);
   const expiresAt = new Date(Date.now() + 1000 * 60 * 30).toISOString(); // 30 minutes
-  
+
   db.prepare(`
     INSERT INTO password_resets (id, email, code, expires_at, used)
     VALUES (?, ?, ?, ?, 0)
@@ -505,7 +962,7 @@ export function verifyAndUsePasswordReset(email: string, code: string, newPasswo
   const now = new Date().toISOString();
 
   const stmt = db.prepare(`
-    SELECT * FROM password_resets 
+    SELECT * FROM password_resets
     WHERE LOWER(email) = LOWER(?) AND code = ? AND used = 0 AND expires_at > ?
     ORDER BY expires_at DESC LIMIT 1
   `);

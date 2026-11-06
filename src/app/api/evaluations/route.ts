@@ -1,10 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
-import { createEvaluation, getEvaluationsByUserId } from '@/lib/db';
+import {
+  createEvaluation,
+  getEvaluationsByUserId,
+  getGoalsByUserId,
+  syncGoalsWithLatestEvaluation,
+} from '@/lib/db';
+import { evaluateAchievements } from '@/lib/achievements';
 import { calculateAllMetrics } from '@/lib/calculations';
-import { Position, ServeType } from '@/lib/types';
+import { LATERALITIES, Laterality, Position, ServeType } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
+
+function round1(n: number): number {
+  return Math.round(n * 10) / 10;
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -38,8 +48,13 @@ export async function POST(request: NextRequest) {
       reach_standing,
       reach_jumping,
       wingspan,
+      seated_height,
+      attack_reach,
+      block_reach,
+      laterality,
       position,
       serve_types,
+      practice_time,
       goals,
       notes
     } = body;
@@ -66,7 +81,7 @@ export async function POST(request: NextRequest) {
       isNaN(parsedWingspan) || parsedWingspan <= 0
     ) {
       return NextResponse.json(
-        { error: 'Todas as medidas físicas devem ser números válidos maiores que zero.' },
+        { error: 'Todas as medidas físicas obrigatórias devem ser números válidos maiores que zero.' },
         { status: 400 }
       );
     }
@@ -78,6 +93,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (isNaN(new Date(evaluation_date).getTime())) {
+      return NextResponse.json({ error: 'Data da avaliação inválida.' }, { status: 400 });
+    }
+
+    // Optional fields (only stored when > 0)
+    const parseOptional = (v: any): number | null => {
+      if (v === undefined || v === null || v === '') return null;
+      const n = parseFloat(v);
+      return isNaN(n) || n <= 0 ? null : round1(n);
+    };
+    const parsedSeated = parseOptional(seated_height);
+    const parsedAttack = parseOptional(attack_reach);
+    const parsedBlock = parseOptional(block_reach);
+
+    // Lateralidade normalization (Destro | Canhoto | Ambidestro)
+    let parsedLaterality: Laterality | null = null;
+    if (laterality) {
+      const match = LATERALITIES.find(
+        l => l.toLowerCase() === String(laterality).toLowerCase()
+      );
+      parsedLaterality = match ?? null;
+    }
+
     // Calculations
     const metrics = calculateAllMetrics(
       birth_date,
@@ -85,10 +123,14 @@ export async function POST(request: NextRequest) {
       parsedHeight,
       parsedStanding,
       parsedJumping,
-      evaluation_date
+      evaluation_date,
+      parsedAttack,
+      parsedBlock
     );
 
     const evalId = 'eval_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
+
+    const goalsText = goals ? goals.trim() : '';
 
     const newEval = createEvaluation({
       id: evalId,
@@ -97,24 +139,39 @@ export async function POST(request: NextRequest) {
       full_name: full_name.trim(),
       birth_date,
       age: metrics.age,
-      weight: Math.round(parsedWeight * 10) / 10,
-      height: Math.round(parsedHeight * 10) / 10,
-      reach_standing: Math.round(parsedStanding * 10) / 10,
-      reach_jumping: Math.round(parsedJumping * 10) / 10,
-      wingspan: Math.round(parsedWingspan * 10) / 10,
+      weight: round1(parsedWeight),
+      height: round1(parsedHeight),
+      reach_standing: round1(parsedStanding),
+      reach_jumping: round1(parsedJumping),
+      wingspan: round1(parsedWingspan),
+      seated_height: parsedSeated,
+      attack_reach: parsedAttack,
+      block_reach: parsedBlock,
+      laterality: parsedLaterality,
+      practice_time: typeof practice_time === 'string' ? practice_time.trim() : '',
       vertical_jump: metrics.vertical_jump,
       bmi: metrics.bmi,
       position: position as Position,
       serve_types: Array.isArray(serve_types) ? (serve_types as ServeType[]) : [],
-      goals: goals ? goals.trim() : '',
+      goals: goalsText,
       notes: notes ? notes.trim() : ''
+    });
+
+    // Metas mensuráveis passam a refletir automaticamente a avaliação mais recente.
+    syncGoalsWithLatestEvaluation(user.id);
+
+    // Desbloqueio automático de conquistas (1ª avaliação, recordes, etc.)
+    const { unlockedNow } = await evaluateAchievements(user.id, {
+      evaluations: getEvaluationsByUserId(user.id),
+      goals: getGoalsByUserId(user.id),
     });
 
     return NextResponse.json({
       success: true,
       message: 'Avaliação física registrada com sucesso no histórico!',
       evaluation: newEval,
-      metrics
+      metrics,
+      unlockedNow,
     });
   } catch (err: any) {
     console.error('Create evaluation error:', err);

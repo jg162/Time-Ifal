@@ -97,7 +97,9 @@ export function calculateAllMetrics(
   height: number,
   standingReach: number,
   jumpingReach: number,
-  evaluationDate?: string
+  evaluationDate?: string,
+  attackReach?: number | null,
+  blockReach?: number | null
 ): CalculationResult {
   const age = calculateAge(birthDate, evaluationDate);
   const vertical_jump = calculateVerticalJump(standingReach, jumpingReach);
@@ -108,6 +110,8 @@ export function calculateAllMetrics(
   return {
     age,
     vertical_jump,
+    attack_reach: attackReach ?? null,
+    block_reach: blockReach ?? null,
     bmi,
     bmi_category,
     jump_category
