@@ -43,9 +43,13 @@ function generateId(prefix: string): string {
 }
 
 function getSupabase(): SupabaseClient | null {
-  const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!rawUrl || !serviceKey || rawUrl.includes('demo.supabase.co')) return null
+  const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
+  const serviceKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_SERVICE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    process.env.SUPABASE_ANON_KEY
+  if (!rawUrl || !serviceKey || rawUrl.includes('demo.supabase.co') || rawUrl.includes('seu-projeto.supabase.co')) return null
   const url = rawUrl.replace(/\/+$/, '')
   if (!supabaseInstance) {
     supabaseInstance = createClient(url, serviceKey, {
@@ -59,9 +63,18 @@ function getSupabase(): SupabaseClient | null {
 }
 
 function isSupabase(): boolean {
-  const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  return Boolean(rawUrl && serviceKey && !rawUrl.includes('demo.supabase.co'))
+  const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
+  const serviceKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_SERVICE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    process.env.SUPABASE_ANON_KEY
+  return Boolean(
+    rawUrl &&
+    serviceKey &&
+    !rawUrl.includes('demo.supabase.co') &&
+    !rawUrl.includes('seu-projeto.supabase.co')
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -174,7 +187,7 @@ export async function createUser(user: { id: string; email: string; password_has
   })
   if (error) throw error
 
-  await sb.from('profiles').insert({
+  const { error: profileError } = await sb.from('profiles').insert({
     user_id: user.id,
     full_name: user.name,
     birth_date: null,
@@ -193,6 +206,21 @@ export async function createUser(user: { id: string; email: string; password_has
     public_card_slug: slug,
     updated_at: now,
   })
+
+  if (profileError) {
+    console.warn('Profile array insert warning, attempting fallback:', profileError.message)
+    try {
+      await sb.from('profiles').insert({
+        user_id: user.id,
+        full_name: user.name,
+        preferred_position: 'Ponteiro',
+        serve_types: '["Flutuante pulando"]',
+        updated_at: now,
+      })
+    } catch (e2: any) {
+      console.warn('Profile string fallback warning:', e2?.message)
+    }
+  }
 
   return { id: user.id, email: user.email.toLowerCase(), name: user.name, avatar_url: user.avatar_url || null, created_at: now }
 }
@@ -223,6 +251,13 @@ export async function updateProfile(userId: string, data: Partial<Profile> & { n
   const current = await getProfileByUserId(userId)
   if (!current) throw new Error('Profile not found')
 
+  let mergedBio = data.bio_goals !== undefined ? data.bio_goals : current.bio_goals
+  const existingTeam = current.bio_goals ? extractTeamMetaFromBio(current.bio_goals) : null
+  if (existingTeam && (!mergedBio || !mergedBio.includes('[TEAM:'))) {
+    const teamTag = `[TEAM:${JSON.stringify(existingTeam.team)}]`
+    mergedBio = mergedBio ? `${teamTag} ${mergedBio.trim()}` : teamTag
+  }
+
   const updates: any = {
     full_name: data.full_name ?? (data.name ?? current.full_name),
     birth_date: data.birth_date !== undefined ? data.birth_date : current.birth_date,
@@ -230,7 +265,7 @@ export async function updateProfile(userId: string, data: Partial<Profile> & { n
     laterality: data.laterality !== undefined ? data.laterality : current.laterality,
     practice_time: data.practice_time !== undefined ? data.practice_time : current.practice_time,
     serve_types: data.serve_types ? data.serve_types : current.serve_types,
-    bio_goals: data.bio_goals !== undefined ? data.bio_goals : current.bio_goals,
+    bio_goals: mergedBio,
     show_weight: data.show_weight !== undefined ? data.show_weight : current.show_weight,
     show_height: data.show_height !== undefined ? data.show_height : current.show_height,
     show_reach: data.show_reach !== undefined ? data.show_reach : current.show_reach,
@@ -358,10 +393,10 @@ interface TeamMeta {
 
 function extractTeamMetaFromBio(bio?: string | null): { team: TeamMeta; cleanBio: string } | null {
   if (!bio) return null
-  // Regex robusta: captura o bloco JSON balanceado após [TEAM:
-  const tagStart = bio.indexOf('[TEAM:{')
+  const tagStart = bio.indexOf('[TEAM:')
   if (tagStart === -1) return null
-  const jsonStart = tagStart + 6 // posição do '{'
+  const jsonStart = bio.indexOf('{', tagStart)
+  if (jsonStart === -1) return null
   let depth = 0
   let jsonEnd = -1
   for (let i = jsonStart; i < bio.length; i++) {
@@ -372,10 +407,10 @@ function extractTeamMetaFromBio(bio?: string | null): { team: TeamMeta; cleanBio
     }
   }
   if (jsonEnd === -1) return null
-  // Verifica que termina com ']'
-  if (bio[jsonEnd + 1] !== ']') return null
+  const closeBracket = bio.indexOf(']', jsonEnd)
+  if (closeBracket === -1) return null
   const jsonStr = bio.substring(jsonStart, jsonEnd + 1)
-  const fullTag = bio.substring(tagStart, jsonEnd + 2) // inclui ']'
+  const fullTag = bio.substring(tagStart, closeBracket + 1)
   try {
     const meta = JSON.parse(jsonStr) as TeamMeta
     const cleanBio = bio.replace(fullTag, '').trim()
@@ -593,7 +628,16 @@ export async function getUserTeam(userId: string): Promise<Team | null> {
     const { data: prof } = await sb.from('profiles').select('bio_goals').eq('user_id', userId).maybeSingle()
     const parsed = extractTeamMetaFromBio(prof?.bio_goals)
     if (parsed) {
-      return getTeamById(parsed.team.id)
+      const full = await getTeamById(parsed.team.id)
+      return full ?? {
+        id: parsed.team.id,
+        name: parsed.team.name,
+        code: parsed.team.code,
+        description: parsed.team.description || '',
+        created_by: parsed.team.created_by,
+        created_at: parsed.team.created_at,
+        members_count: 1
+      }
     }
   } catch {
     // ignore
@@ -658,6 +702,72 @@ export async function addUserToTeam(userId: string, teamId: string, role = 'atle
   } catch (e: any) {
     console.warn('addUserToTeam profile fallback error:', e?.message)
   }
+}
+
+export async function removeUserFromTeam(userId: string, teamId: string): Promise<void> {
+  if (!isSupabase()) return
+  const sb = getSupabase()!
+
+  // 1. Tenta deletar de team_members
+  try {
+    await sb.from('team_members').delete().eq('user_id', userId).eq('team_id', teamId)
+  } catch (e: any) {
+    console.warn('removeUserFromTeam team_members error:', e?.message)
+  }
+
+  // 2. Fallback: limpa a tag do perfil
+  try {
+    const { data: prof } = await sb.from('profiles').select('bio_goals').eq('user_id', userId).maybeSingle()
+    if (prof?.bio_goals) {
+      const cleanBio = extractTeamMetaFromBio(prof.bio_goals)?.cleanBio ?? prof.bio_goals
+      await sb.from('profiles').update({ bio_goals: cleanBio }).eq('user_id', userId)
+    }
+  } catch (e: any) {
+    console.warn('removeUserFromTeam profile fallback error:', e?.message)
+  }
+}
+
+export async function updateTeam(teamId: string, updates: { name?: string; description?: string; code?: string }): Promise<Team | null> {
+  if (!isSupabase()) return null
+  const sb = getSupabase()!
+
+  const current = await getTeamById(teamId)
+  if (!current) return null
+
+  const newName = updates.name !== undefined ? updates.name.trim() : current.name
+  const newDesc = updates.description !== undefined ? updates.description.trim() : current.description
+  const newCode = updates.code !== undefined ? updates.code.trim().toUpperCase() : current.code
+
+  // 1. Tenta atualizar na tabela teams
+  try {
+    await sb.from('teams').update({
+      name: newName,
+      description: newDesc,
+      code: newCode
+    }).eq('id', teamId)
+  } catch {}
+
+  // 2. Fallback: atualiza tags nos perfis
+  try {
+    const { data: profiles } = await sb.from('profiles').select('user_id, bio_goals')
+    if (profiles) {
+      for (const p of profiles) {
+        const parsed = extractTeamMetaFromBio(p.bio_goals)
+        if (parsed && parsed.team.id === teamId) {
+          const updatedTag = `[TEAM:${JSON.stringify({
+            ...parsed.team,
+            name: newName,
+            description: newDesc,
+            code: newCode
+          })}]`
+          const newBio = parsed.cleanBio ? `${updatedTag} ${parsed.cleanBio}` : updatedTag
+          await sb.from('profiles').update({ bio_goals: newBio }).eq('user_id', p.user_id)
+        }
+      }
+    }
+  } catch {}
+
+  return getTeamById(teamId)
 }
 
 // ---------------------------------------------------------------------------

@@ -22,5 +22,9 @@ export async function ensureSeedData() {
   if (useSupabase()) {
     return ensureSeedDataDb();
   }
+  // No ambiente serverless (Vercel), não tenta carregar SQLite se Supabase não estiver configurado
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+    return;
+  }
   await cleanupSqliteMockAthletes();
 }

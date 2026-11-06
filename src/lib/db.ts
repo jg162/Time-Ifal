@@ -35,6 +35,9 @@ import {
 let sqliteModule: typeof import('./db-sqlite') | null = null
 
 async function getSqlite() {
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+    throw new Error('Banco de dados de produção (Supabase) não configurado. Por favor, configure as variáveis NEXT_PUBLIC_SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY no painel da Vercel.');
+  }
   if (!sqliteModule) {
     sqliteModule = await import('./db-sqlite')
   }
@@ -42,12 +45,17 @@ async function getSqlite() {
 }
 
 function useSupabase(): boolean {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
+  const key =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_SERVICE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    process.env.SUPABASE_ANON_KEY
   return Boolean(
     url &&
     key &&
-    !url.includes('demo.supabase.co')
+    !url.includes('demo.supabase.co') &&
+    !url.includes('seu-projeto.supabase.co')
   )
 }
 
@@ -157,6 +165,18 @@ export async function addUserToTeam(userId: string, teamId: string, role = 'atle
   if (useSupabase()) return supabase.addUserToTeam(userId, teamId, role)
   const sql = await getSqlite()
   return sql.addUserToTeam(userId, teamId, role)
+}
+
+export async function removeUserFromTeam(userId: string, teamId: string): Promise<void> {
+  if (useSupabase()) return supabase.removeUserFromTeam(userId, teamId)
+  const sql = await getSqlite()
+  return sql.removeUserFromTeam(userId, teamId)
+}
+
+export async function updateTeam(teamId: string, updates: { name?: string; description?: string; code?: string }): Promise<Team | null> {
+  if (useSupabase()) return supabase.updateTeam(teamId, updates)
+  const sql = await getSqlite()
+  return sql.updateTeam(teamId, updates)
 }
 
 // ---------------------------------------------------------------------------

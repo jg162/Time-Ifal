@@ -27,9 +27,16 @@ function RegisterForm() {
       return;
     }
     fetch(`/api/teams?code=${encodeURIComponent(teamCode)}`)
-      .then((r) => r.json())
+      .then(async (r) => {
+        if (!r.ok) return null;
+        try {
+          return await r.json();
+        } catch {
+          return null;
+        }
+      })
       .then((data) => {
-        if (data.team) setInvitedTeam({ name: data.team.name, code: data.team.code });
+        if (data?.team) setInvitedTeam({ name: data.team.name, code: data.team.code });
       })
       .catch(() => {})
       .finally(() => setTeamLookupDone(true));
@@ -64,21 +71,21 @@ function RegisterForm() {
         }),
       });
 
+      const rawText = await res.text();
       let data: any = {};
-      const contentType = res.headers.get('content-type') || '';
-      if (contentType.includes('application/json')) {
-        data = await res.json();
-      } else {
-        const text = await res.text();
-        throw new Error(
-          res.status >= 500
-            ? 'Erro no servidor ao processar o cadastro. Tente novamente mais tarde.'
-            : text || 'Erro inesperado na resposta do servidor.'
-        );
+      try {
+        data = rawText ? JSON.parse(rawText) : {};
+      } catch {
+        data = {};
       }
 
       if (!res.ok) {
-        throw new Error(data.error || 'Erro ao criar conta.');
+        throw new Error(
+          data.error ||
+          (res.status >= 500
+            ? 'Erro no servidor ao processar o cadastro. Verifique as configurações do banco de dados (Supabase) no painel da Vercel.'
+            : 'Erro ao cadastrar atleta. Verifique os dados e tente novamente.')
+        );
       }
 
       router.push('/dashboard');

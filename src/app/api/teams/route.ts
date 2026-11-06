@@ -78,6 +78,9 @@ export async function POST(request: NextRequest) {
     });
   } catch (err: any) {
     console.error('Error creating team:', err);
-    return NextResponse.json({ error: 'Erro ao criar time. Tente novamente.' }, { status: 500 });
+    return NextResponse.json(
+      { error: err?.message || 'Erro ao criar time. Verifique se seu perfil está completo e tente novamente.' },
+      { status: 500 }
+    );
   }
 }

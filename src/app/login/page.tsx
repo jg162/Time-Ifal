@@ -26,21 +26,21 @@ export default function LoginPage() {
         body: JSON.stringify({ email, password }),
       });
 
+      const rawText = await res.text();
       let data: any = {};
-      const contentType = res.headers.get('content-type') || '';
-      if (contentType.includes('application/json')) {
-        data = await res.json();
-      } else {
-        const text = await res.text();
-        throw new Error(
-          res.status >= 500
-            ? 'Erro no servidor ao autenticar. Tente novamente mais tarde.'
-            : text || 'Erro inesperado na resposta do servidor.'
-        );
+      try {
+        data = rawText ? JSON.parse(rawText) : {};
+      } catch {
+        data = {};
       }
 
       if (!res.ok) {
-        throw new Error(data.error || 'Falha ao autenticar.');
+        throw new Error(
+          data.error ||
+          (res.status >= 500
+            ? 'Erro no servidor ao autenticar. Verifique a configuração do banco de dados no painel da Vercel.'
+            : 'Falha ao autenticar.')
+        );
       }
 
       router.push('/dashboard');

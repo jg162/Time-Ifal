@@ -30,17 +30,12 @@ export default function RecoverPasswordPage() {
         body: JSON.stringify({ email }),
       });
 
+      const rawText = await res.text();
       let data: any = {};
-      const contentType = res.headers.get('content-type') || '';
-      if (contentType.includes('application/json')) {
-        data = await res.json();
-      } else {
-        const text = await res.text();
-        throw new Error(
-          res.status >= 500
-            ? 'Erro no servidor ao solicitar recuperação. Tente novamente mais tarde.'
-            : text || 'Erro inesperado na resposta do servidor.'
-        );
+      try {
+        data = rawText ? JSON.parse(rawText) : {};
+      } catch {
+        data = {};
       }
       if (!res.ok) {
         throw new Error(data.error || 'Erro ao solicitar recuperação.');
@@ -86,17 +81,12 @@ export default function RecoverPasswordPage() {
         body: JSON.stringify({ email, code, newPassword, confirmPassword }),
       });
 
+      const rawText = await res.text();
       let data: any = {};
-      const contentType = res.headers.get('content-type') || '';
-      if (contentType.includes('application/json')) {
-        data = await res.json();
-      } else {
-        const text = await res.text();
-        throw new Error(
-          res.status >= 500
-            ? 'Erro no servidor ao redefinir senha. Tente novamente mais tarde.'
-            : text || 'Erro inesperado na resposta do servidor.'
-        );
+      try {
+        data = rawText ? JSON.parse(rawText) : {};
+      } catch {
+        data = {};
       }
       if (!res.ok) {
         throw new Error(data.error || 'Erro ao redefinir senha.');

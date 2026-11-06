@@ -86,9 +86,10 @@ export async function POST(request: NextRequest) {
     setAuthCookie(response, token);
     return response;
   } catch (err: any) {
+    const errorMsg = err?.message || 'Erro ao processar cadastro. Tente novamente mais tarde.';
     console.error('Registration error:', err);
     return NextResponse.json(
-      { error: 'Erro ao processar cadastro. Tente novamente mais tarde.' },
+      { error: errorMsg },
       { status: 500 }
     );
   }

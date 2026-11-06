@@ -622,6 +622,31 @@ export function addUserToTeam(userId: string, teamId: string, role = 'atleta'): 
   db.prepare('UPDATE profiles SET team_id = ? WHERE user_id = ?').run(teamId, userId);
 }
 
+export function removeUserFromTeam(userId: string, teamId: string): void {
+  const db = getDatabase();
+  db.prepare('DELETE FROM team_members WHERE user_id = ? AND team_id = ?').run(userId, teamId);
+  db.prepare('UPDATE profiles SET team_id = NULL WHERE user_id = ? AND team_id = ?').run(userId, teamId);
+}
+
+export function updateTeam(teamId: string, updates: { name?: string; description?: string; code?: string }): Team | null {
+  const db = getDatabase();
+  const current = getTeamById(teamId);
+  if (!current) return null;
+
+  const newName = updates.name !== undefined ? updates.name.trim() : current.name;
+  const newDesc = updates.description !== undefined ? updates.description.trim() : current.description;
+  const newCode = updates.code !== undefined ? updates.code.trim().toUpperCase() : current.code;
+
+  db.prepare('UPDATE teams SET name = ?, description = ?, code = ? WHERE id = ?').run(
+    newName,
+    newDesc,
+    newCode,
+    teamId
+  );
+
+  return getTeamById(teamId);
+}
+
 // ----------------- TEAM HELPERS WITH PRIVACY -----------------
 export function getAllTeamAthletes(requestingUserId?: string, teamIdFilter?: string): TeamAthlete[] {
   const db = getDatabase();
