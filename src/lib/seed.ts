@@ -1,0 +1,256 @@
+import bcrypt from 'bcryptjs';
+import { getDatabase, getUserByEmail, createEvaluation, updateProfile } from './db';
+import { calculateAllMetrics } from './calculations';
+
+export async function ensureSeedData() {
+  const db = getDatabase();
+
+  const count = (db.prepare('SELECT COUNT(*) as cnt FROM users').get() as any)?.cnt || 0;
+  if (count > 0) {
+    return;
+  }
+
+  const defaultPasswordHash = await bcrypt.hash('ifal1234', 10);
+
+  const initialAthletes = [
+    {
+      id: 'athlete-matheus-santos',
+      name: 'Matheus Santos',
+      email: 'matheus.santos@ifal.edu.br',
+      avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+      position: 'Ponteiro' as const,
+      birth_date: '2004-05-14',
+      serve_types: ['Viagem', 'Flutuante pulando'] as const,
+      bio_goals: 'Evoluir consistência no ataque de ponta contra bloqueio duplo e aprimorar a potência do saque viagem nos momentos decisivos.',
+      evaluations: [
+        {
+          date: '2025-08-10',
+          weight: 84.5,
+          height: 194,
+          standingReach: 248,
+          jumpingReach: 330,
+          wingspan: 199,
+          goals: 'Aumentar impulsão vertical em 5cm e manter porcentagem de acerto no ataque acima de 55%.'
+        },
+        {
+          date: '2025-11-20',
+          weight: 85.2,
+          height: 194,
+          standingReach: 248,
+          jumpingReach: 336,
+          wingspan: 199,
+          goals: 'Foco na aceleração de passada no salto e velocidade de braço.'
+        },
+        {
+          date: '2026-02-15',
+          weight: 86.0,
+          height: 195,
+          standingReach: 249,
+          jumpingReach: 342,
+          wingspan: 200,
+          goals: 'Alcançar 345cm de alcance no ataque e consolidar recepção na linha de passe.'
+        }
+      ]
+    },
+    {
+      id: 'athlete-gabriel-silva',
+      name: 'Gabriel Silva',
+      email: 'gabriel.silva@ifal.edu.br',
+      avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+      position: 'Central' as const,
+      birth_date: '2003-09-22',
+      serve_types: ['Flutuante pulando', 'Flutuante parado'] as const,
+      bio_goals: 'Dominar leitura rápida de levantadores adversários, velocidade de deslocamento lateral e fechamento de bloqueio triplo.',
+      evaluations: [
+        {
+          date: '2025-09-05',
+          weight: 92.0,
+          height: 201,
+          standingReach: 260,
+          jumpingReach: 345,
+          wingspan: 208,
+          goals: 'Melhorar velocidade de passada para bloqueio nas extremidades.'
+        },
+        {
+          date: '2026-01-18',
+          weight: 93.5,
+          height: 202,
+          standingReach: 261,
+          jumpingReach: 352,
+          wingspan: 209,
+          goals: 'Atingir 355cm de alcance no bloqueio e potência no primeiro tempo com o levantador.'
+        }
+      ]
+    },
+    {
+      id: 'athlete-lucas-oliveira',
+      name: 'Lucas Oliveira',
+      email: 'lucas.oliveira@ifal.edu.br',
+      avatar_url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
+      position: 'Levantador' as const,
+      birth_date: '2005-02-10',
+      serve_types: ['Flutuante pulando', 'Híbrido'] as const,
+      bio_goals: 'Precisão milimétrica nas bolas aceleradas de ponta e pipe, além de leitura tática de bloqueio adversário.',
+      evaluations: [
+        {
+          date: '2025-08-15',
+          weight: 76.0,
+          height: 185,
+          standingReach: 236,
+          jumpingReach: 312,
+          wingspan: 188,
+          goals: 'Aprimorar impulsão no salto para levantamento em suspensão.'
+        },
+        {
+          date: '2026-02-01',
+          weight: 77.4,
+          height: 186,
+          standingReach: 237,
+          jumpingReach: 318,
+          wingspan: 189,
+          goals: 'Consolidar precisão nas bolas rápidas de meio e defesa na diagonal.'
+        }
+      ]
+    },
+    {
+      id: 'athlete-rafael-costa',
+      name: 'Rafael Costa',
+      email: 'rafael.costa@ifal.edu.br',
+      avatar_url: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80',
+      position: 'Líbero' as const,
+      birth_date: '2004-11-03',
+      serve_types: ['Saque por cima', 'Flutuante parado'] as const,
+      bio_goals: 'Liderar a comunicação da linha defensiva, cobrir bloqueio e manter passe A acima de 70% nas partidas.',
+      evaluations: [
+        {
+          date: '2025-09-12',
+          weight: 68.5,
+          height: 174,
+          standingReach: 224,
+          jumpingReach: 295,
+          wingspan: 176,
+          goals: 'Agilidade lateral, tempo de reação e controle de manchete.'
+        },
+        {
+          date: '2026-02-10',
+          weight: 69.2,
+          height: 175,
+          standingReach: 225,
+          jumpingReach: 302,
+          wingspan: 177,
+          goals: 'Reforçar estabilidade no passe de saques viagem potentes.'
+        }
+      ]
+    },
+    {
+      id: 'athlete-thiago-almeida',
+      name: 'Thiago Almeida',
+      email: 'thiago.almeida@ifal.edu.br',
+      avatar_url: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=150&auto=format&fit=crop&q=80',
+      position: 'Oposto' as const,
+      birth_date: '2003-07-19',
+      serve_types: ['Viagem', 'Híbrido'] as const,
+      bio_goals: 'Ser a referência na saída de rede nos momentos de bola alta, potência no saque viagem acima de 100km/h.',
+      evaluations: [
+        {
+          date: '2025-08-25',
+          weight: 90.0,
+          height: 198,
+          standingReach: 254,
+          jumpingReach: 338,
+          wingspan: 204,
+          goals: 'Ganho de potência no salto e resistência física para jogos de 5 sets.'
+        },
+        {
+          date: '2026-02-22',
+          weight: 91.5,
+          height: 198,
+          standingReach: 254,
+          jumpingReach: 348,
+          wingspan: 205,
+          goals: 'Superar os 350cm de alcance e calibrar diagonal curta na saída.'
+        }
+      ]
+    }
+  ];
+
+  const now = new Date().toISOString();
+
+  const insertUserStmt = db.prepare(`
+    INSERT OR IGNORE INTO users (id, email, password_hash, name, avatar_url, created_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `);
+
+  const insertProfileStmt = db.prepare(`
+    INSERT OR IGNORE INTO profiles (
+      user_id, full_name, birth_date, preferred_position, serve_types, bio_goals,
+      show_weight, show_height, show_reach, show_wingspan, show_goals, show_evaluations, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, 1, 1, 1, 1, 1, 1, ?)
+  `);
+
+  const insertEvalStmt = db.prepare(`
+    INSERT OR IGNORE INTO evaluations (
+      id, user_id, evaluation_date, full_name, birth_date, age,
+      weight, height, reach_standing, reach_jumping, wingspan,
+      vertical_jump, bmi, position, serve_types, goals, notes, created_at
+    ) VALUES (
+      ?, ?, ?, ?, ?, ?,
+      ?, ?, ?, ?, ?,
+      ?, ?, ?, ?, ?, ?, ?
+    )
+  `);
+
+  const tx = db.transaction(() => {
+    for (const a of initialAthletes) {
+      insertUserStmt.run(a.id, a.email.toLowerCase(), defaultPasswordHash, a.name, a.avatar_url, now);
+      insertProfileStmt.run(
+        a.id,
+        a.name,
+        a.birth_date,
+        a.position,
+        JSON.stringify([...a.serve_types]),
+        a.bio_goals,
+        now
+      );
+
+      for (let i = 0; i < a.evaluations.length; i++) {
+        const ev = a.evaluations[i];
+        const metrics = calculateAllMetrics(
+          a.birth_date,
+          ev.weight,
+          ev.height,
+          ev.standingReach,
+          ev.jumpingReach,
+          ev.date
+        );
+
+        insertEvalStmt.run(
+          `eval-${a.id}-${i + 1}`,
+          a.id,
+          ev.date,
+          a.name,
+          a.birth_date,
+          metrics.age,
+          ev.weight,
+          ev.height,
+          ev.standingReach,
+          ev.jumpingReach,
+          ev.wingspan,
+          metrics.vertical_jump,
+          metrics.bmi,
+          a.position,
+          JSON.stringify([...a.serve_types]),
+          ev.goals,
+          'Avaliação periódica de desempenho esportivo.',
+          now
+        );
+      }
+    }
+  });
+
+  try {
+    tx();
+  } catch (err) {
+    // If concurrent run inserted, safely ignore
+  }
+}
