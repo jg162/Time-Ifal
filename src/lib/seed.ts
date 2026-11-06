@@ -3,9 +3,6 @@ import { calculateAllMetrics } from './calculations';
 import { ensureSeedData as ensureSeedDataDb } from './db';
 import { useSupabase } from './db';
 
-// SQLite local (modo desenvolvimento) – import direto para operações SQL
-import { getDatabase as getSqliteDatabase } from './db-sqlite';
-
 const initialAthletes = [
   {
     id: 'athlete-matheus-santos',
@@ -90,8 +87,9 @@ const initialAthletes = [
   },
 ];
 
-function seedSqlite() {
-  const db = getSqliteDatabase();
+async function seedSqlite() {
+  const { getDatabase } = await import('./db-sqlite');
+  const db = getDatabase();
   const now = new Date().toISOString();
   const defaultPasswordHash = bcrypt.hashSync('ifal1234', 10);
 
@@ -151,5 +149,5 @@ export async function ensureSeedData() {
   if (useSupabase()) {
     return ensureSeedDataDb();
   }
-  seedSqlite();
+  await seedSqlite();
 }

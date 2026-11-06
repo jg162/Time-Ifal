@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import crypto from 'crypto';
 import {
   Achievement,
@@ -17,19 +18,38 @@ import {
   User,
 } from './types';
 
-// Ensure data directory exists
-const dbDir = path.join(process.cwd(), 'data');
-if (!fs.existsSync(dbDir)) {
-  fs.mkdirSync(dbDir, { recursive: true });
-}
-
-const dbPath = path.join(dbDir, 'volleyball.db');
-
 // Singleton database instance
 let dbInstance: Database.Database | null = null;
 
+function resolveDatabasePath(): string {
+  const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+  const preferredDir = isServerless
+    ? path.join(os.tmpdir(), 'time-ifal-data')
+    : path.join(process.cwd(), 'data');
+
+  if (!fs.existsSync(preferredDir)) {
+    try {
+      fs.mkdirSync(preferredDir, { recursive: true });
+    } catch {
+      // Se process.cwd() for somente-leitura (ex: Vercel), faz fallback para tmp
+      const tmpDir = path.join(os.tmpdir(), 'time-ifal-data');
+      try {
+        if (!fs.existsSync(tmpDir)) {
+          fs.mkdirSync(tmpDir, { recursive: true });
+        }
+      } catch {
+        // ignora
+      }
+      return path.join(tmpDir, 'volleyball.db');
+    }
+  }
+
+  return path.join(preferredDir, 'volleyball.db');
+}
+
 export function getDatabase(): Database.Database {
   if (!dbInstance) {
+    const dbPath = resolveDatabasePath();
     dbInstance = new Database(dbPath);
     dbInstance.pragma('journal_mode = WAL');
     dbInstance.pragma('foreign_keys = ON');

@@ -11,8 +11,8 @@
  * aplicação, igual ao comportamento do SQLite.
  */
 
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import bcrypt from 'bcryptjs'
 import {
   Achievement,
   AchievementKey,
@@ -34,25 +34,32 @@ import {
 // Cliente Supabase (service role - bypass de RLS, validação na aplicação)
 // ---------------------------------------------------------------------------
 
+let supabaseInstance: SupabaseClient | null = null
+
 function generateId(prefix: string): string {
   return prefix + Math.random().toString(36).substring(2, 10) + Date.now().toString(36)
 }
 
-function getSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+function getSupabase(): SupabaseClient | null {
+  const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !serviceKey || url.includes('demo.supabase.co')) return null
-  return createServerClient(url, serviceKey, {
-    cookies: {
-      getAll() { return [] },
-      setAll() { /* no-op em Route Handlers sem cookieStore direto */ },
-    },
-  })
+  if (!rawUrl || !serviceKey || rawUrl.includes('demo.supabase.co')) return null
+  const url = rawUrl.replace(/\/+$/, '')
+  if (!supabaseInstance) {
+    supabaseInstance = createClient(url, serviceKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    })
+  }
+  return supabaseInstance
 }
 
-function isSupabase() {
-  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY &&
-    !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('demo.supabase.co'))
+function isSupabase(): boolean {
+  const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  return Boolean(rawUrl && serviceKey && !rawUrl.includes('demo.supabase.co'))
 }
 
 // ---------------------------------------------------------------------------
@@ -727,32 +734,40 @@ export async function verifyAndUsePasswordReset(email: string, code: string, new
 
 export async function ensureSeedDataSupabase(): Promise<void> {
   if (!isSupabase()) return
-  const sb = getSupabase()!
+  const sb = getSupabase()
+  if (!sb) return
 
-  const { count } = await sb.from('users').select('*', { count: 'exact', head: true })
-  if (count && count > 0) return
-
-  const bcrypt = await import('bcryptjs')
-  const defaultPasswordHash = await bcrypt.default.hash('ifal1234', 10)
-
-  const initialAthletes = [
-    { id: 'athlete-matheus-santos', name: 'Matheus Santos', email: 'matheus.santos@ifal.edu.br', avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80', position: 'Ponteiro', birth_date: '2004-05-14', serve_types: ['Viagem', 'Flutuante pulando'], bio_goals: 'Evoluir consistência no ataque de ponta contra bloqueio duplo e aprimorar a potência do saque viagem nos momentos decisivos.', laterality: 'Destro', practice_time: '5 anos', evaluations: [{ date: '2025-08-10', weight: 84.5, height: 194, standingReach: 248, jumpingReach: 330, wingspan: 199, seated_height: 98, attack_reach: 338, block_reach: 333, goals: 'Aumentar impulsão vertical em 5cm e manter porcentagem de acerto no ataque acima de 55%.', laterality: 'Destro', practice_time: '5 anos' }, { date: '2025-11-20', weight: 85.2, height: 194, standingReach: 248, jumpingReach: 336, wingspan: 199, seated_height: 98, attack_reach: 344, block_reach: 339, goals: 'Foco na aceleração de passada no salto e velocidade de braço.', laterality: 'Destro', practice_time: '5 anos' }, { date: '2026-02-15', weight: 86.0, height: 195, standingReach: 249, jumpingReach: 342, wingspan: 200, seated_height: 99, attack_reach: 350, block_reach: 345, goals: 'Alcançar 345cm de alcance no ataque e consolidar recepção na linha de passe.', laterality: 'Destro', practice_time: '5 anos' }] },
-    { id: 'athlete-gabriel-silva', name: 'Gabriel Silva', email: 'gabriel.silva@ifal.edu.br', avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80', position: 'Central', birth_date: '2003-09-22', serve_types: ['Flutuante pulando', 'Flutuante parado'], bio_goals: 'Dominar leitura rápida de levantadores adversários, velocidade de deslocamento lateral e fechamento de bloqueio triplo.', laterality: 'Destro', practice_time: '8 anos', evaluations: [{ date: '2025-09-05', weight: 92.0, height: 201, standingReach: 260, jumpingReach: 345, wingspan: 208, seated_height: 104, attack_reach: 353, block_reach: 349, goals: 'Melhorar velocidade de passada para bloqueio nas extremidades.', laterality: 'Destro', practice_time: '8 anos' }, { date: '2026-01-18', weight: 93.5, height: 202, standingReach: 261, jumpingReach: 352, wingspan: 209, seated_height: 105, attack_reach: 360, block_reach: 356, goals: 'Atingir 355cm de alcance no bloqueio e potência no primeiro tempo com o levantador.', laterality: 'Destro', practice_time: '8 anos' }] },
-    { id: 'athlete-lucas-oliveira', name: 'Lucas Oliveira', email: 'lucas.oliveira@ifal.edu.br', avatar_url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80', position: 'Levantador', birth_date: '2005-02-10', serve_types: ['Flutuante pulando', 'Híbrido'], bio_goals: 'Precisão milimétrica nas bolas aceleradas de ponta e pipe, além de leitura tática de bloqueio adversário.', laterality: 'Destro', practice_time: '5 anos', evaluations: [{ date: '2025-08-15', weight: 76.0, height: 185, standingReach: 236, jumpingReach: 312, wingspan: 188, seated_height: 94, attack_reach: 320, block_reach: 316, goals: 'Aprimorar impulsão no salto para levantamento em suspensão.', laterality: 'Destro', practice_time: '5 anos' }, { date: '2026-02-01', weight: 77.4, height: 186, standingReach: 237, jumpingReach: 318, wingspan: 189, seated_height: 95, attack_reach: 326, block_reach: 322, goals: 'Consolidar precisão nas bolas rápidas de meio e defesa na diagonal.', laterality: 'Destro', practice_time: '5 anos' }] },
-    { id: 'athlete-rafael-costa', name: 'Rafael Costa', email: 'rafael.costa@ifal.edu.br', avatar_url: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80', position: 'Líbero', birth_date: '2004-11-03', serve_types: ['Saque por cima', 'Flutuante parado'], bio_goals: 'Liderar a comunicação da linha defensiva, cobrir bloqueio e manter passe A acima de 70% nas partidas.', laterality: 'Destro', practice_time: '4 anos', evaluations: [{ date: '2025-09-12', weight: 68.5, height: 174, standingReach: 224, jumpingReach: 295, wingspan: 176, seated_height: 88, attack_reach: 303, block_reach: 299, goals: 'Agilidade lateral, tempo de reação e controle de manchete.', laterality: 'Destro', practice_time: '4 anos' }, { date: '2026-02-10', weight: 69.2, height: 175, standingReach: 225, jumpingReach: 302, wingspan: 177, seated_height: 89, attack_reach: 310, block_reach: 306, goals: 'Reforçar estabilidade no passe de saques viagem potentes.', laterality: 'Destro', practice_time: '4 anos' }] },
-    { id: 'athlete-thiago-almeida', name: 'Thiago Almeida', email: 'thiago.almeida@ifal.edu.br', avatar_url: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=150&auto=format&fit=crop&q=80', position: 'Oposto', birth_date: '2003-07-19', serve_types: ['Viagem', 'Híbrido'], bio_goals: 'Ser a referência na saída de rede nos momentos de bola alta, potência no saque viagem acima de 100km/h.', laterality: 'Canhoto', practice_time: '7 anos', evaluations: [{ date: '2025-08-25', weight: 90.0, height: 198, standingReach: 254, jumpingReach: 338, wingspan: 204, seated_height: 102, attack_reach: 346, block_reach: 342, goals: 'Ganho de potência no salto e resistência física para jogos de 5 sets.', laterality: 'Canhoto', practice_time: '7 anos' }, { date: '2026-02-22', weight: 91.5, height: 198, standingReach: 254, jumpingReach: 348, wingspan: 205, seated_height: 102, attack_reach: 356, block_reach: 352, goals: 'Superar os 350cm de alcance e calibrar diagonal curta na saída.', laterality: 'Canhoto', practice_time: '7 anos' }] },
-  ]
-
-  const now = new Date().toISOString()
-  for (const a of initialAthletes) {
-    const slug = await generateCardSlugSupabase(a.name)
-    await sb.from('users').insert({ id: a.id, email: a.email.toLowerCase(), password_hash: defaultPasswordHash, name: a.name, avatar_url: a.avatar_url, created_at: now })
-    await sb.from('profiles').insert({ user_id: a.id, full_name: a.name, birth_date: a.birth_date, preferred_position: a.position, laterality: a.laterality, practice_time: a.practice_time, serve_types: a.serve_types, bio_goals: a.bio_goals, show_weight: true, show_height: true, show_reach: true, show_wingspan: true, show_goals: true, show_evaluations: true, show_in_rankings: true, public_card_enabled: false, public_card_slug: slug, updated_at: now })
-    for (let i = 0; i < a.evaluations.length; i++) {
-      const ev = a.evaluations[i]
-      const metrics = calculateAllMetricsSupabase(a.birth_date, ev.weight, ev.height, ev.standingReach, ev.jumpingReach, ev.date, ev.attack_reach, ev.block_reach)
-      await sb.from('evaluations').insert({ id: `eval-${a.id}-${i + 1}`, user_id: a.id, evaluation_date: ev.date, full_name: a.name, birth_date: a.birth_date, age: metrics.age, weight: ev.weight, height: ev.height, reach_standing: ev.standingReach, reach_jumping: ev.jumpingReach, wingspan: ev.wingspan, seated_height: ev.seated_height, attack_reach: ev.attack_reach, block_reach: ev.block_reach, laterality: ev.laterality, practice_time: ev.practice_time, vertical_jump: metrics.vertical_jump, bmi: metrics.bmi, position: a.position, serve_types: a.serve_types, goals: ev.goals, notes: 'Avaliação periódica de desempenho esportivo.', created_at: now })
+  try {
+    const { count, error } = await sb.from('users').select('*', { count: 'exact', head: true })
+    if (error) {
+      console.warn('ensureSeedDataSupabase check error:', error.message)
+      return
     }
+    if (count && count > 0) return
+
+    const defaultPasswordHash = await bcrypt.hash('ifal1234', 10)
+
+    const initialAthletes = [
+      { id: 'athlete-matheus-santos', name: 'Matheus Santos', email: 'matheus.santos@ifal.edu.br', avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80', position: 'Ponteiro', birth_date: '2004-05-14', serve_types: ['Viagem', 'Flutuante pulando'], bio_goals: 'Evoluir consistência no ataque de ponta contra bloqueio duplo e aprimorar a potência do saque viagem nos momentos decisivos.', laterality: 'Destro', practice_time: '5 anos', evaluations: [{ date: '2025-08-10', weight: 84.5, height: 194, standingReach: 248, jumpingReach: 330, wingspan: 199, seated_height: 98, attack_reach: 338, block_reach: 333, goals: 'Aumentar impulsão vertical em 5cm e manter porcentagem de acerto no ataque acima de 55%.', laterality: 'Destro', practice_time: '5 anos' }, { date: '2025-11-20', weight: 85.2, height: 194, standingReach: 248, jumpingReach: 336, wingspan: 199, seated_height: 98, attack_reach: 344, block_reach: 339, goals: 'Foco na aceleração de passada no salto e velocidade de braço.', laterality: 'Destro', practice_time: '5 anos' }, { date: '2026-02-15', weight: 86.0, height: 195, standingReach: 249, jumpingReach: 342, wingspan: 200, seated_height: 99, attack_reach: 350, block_reach: 345, goals: 'Alcançar 345cm de alcance no ataque e consolidar recepção na linha de passe.', laterality: 'Destro', practice_time: '5 anos' }] },
+      { id: 'athlete-gabriel-silva', name: 'Gabriel Silva', email: 'gabriel.silva@ifal.edu.br', avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80', position: 'Central', birth_date: '2003-09-22', serve_types: ['Flutuante pulando', 'Flutuante parado'], bio_goals: 'Dominar leitura rápida de levantadores adversários, velocidade de deslocamento lateral e fechamento de bloqueio triplo.', laterality: 'Destro', practice_time: '8 anos', evaluations: [{ date: '2025-09-05', weight: 92.0, height: 201, standingReach: 260, jumpingReach: 345, wingspan: 208, seated_height: 104, attack_reach: 353, block_reach: 349, goals: 'Melhorar velocidade de passada para bloqueio nas extremidades.', laterality: 'Destro', practice_time: '8 anos' }, { date: '2026-01-18', weight: 93.5, height: 202, standingReach: 261, jumpingReach: 352, wingspan: 209, seated_height: 105, attack_reach: 360, block_reach: 356, goals: 'Atingir 355cm de alcance no bloqueio e potência no primeiro tempo com o levantador.', laterality: 'Destro', practice_time: '8 anos' }] },
+      { id: 'athlete-lucas-oliveira', name: 'Lucas Oliveira', email: 'lucas.oliveira@ifal.edu.br', avatar_url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80', position: 'Levantador', birth_date: '2005-02-10', serve_types: ['Flutuante pulando', 'Híbrido'], bio_goals: 'Precisão milimétrica nas bolas aceleradas de ponta e pipe, além de leitura tática de bloqueio adversário.', laterality: 'Destro', practice_time: '5 anos', evaluations: [{ date: '2025-08-15', weight: 76.0, height: 185, standingReach: 236, jumpingReach: 312, wingspan: 188, seated_height: 94, attack_reach: 320, block_reach: 316, goals: 'Aprimorar impulsão no salto para levantamento em suspensão.', laterality: 'Destro', practice_time: '5 anos' }, { date: '2026-02-01', weight: 77.4, height: 186, standingReach: 237, jumpingReach: 318, wingspan: 189, seated_height: 95, attack_reach: 326, block_reach: 322, goals: 'Consolidar precisão nas bolas rápidas de meio e defesa na diagonal.', laterality: 'Destro', practice_time: '5 anos' }] },
+      { id: 'athlete-rafael-costa', name: 'Rafael Costa', email: 'rafael.costa@ifal.edu.br', avatar_url: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80', position: 'Líbero', birth_date: '2004-11-03', serve_types: ['Saque por cima', 'Flutuante parado'], bio_goals: 'Liderar a comunicação da linha defensiva, cobrir bloqueio e manter passe A acima de 70% nas partidas.', laterality: 'Destro', practice_time: '4 anos', evaluations: [{ date: '2025-09-12', weight: 68.5, height: 174, standingReach: 224, jumpingReach: 295, wingspan: 176, seated_height: 88, attack_reach: 303, block_reach: 299, goals: 'Agilidade lateral, tempo de reação e controle de manchete.', laterality: 'Destro', practice_time: '4 anos' }, { date: '2026-02-10', weight: 69.2, height: 175, standingReach: 225, jumpingReach: 302, wingspan: 177, seated_height: 89, attack_reach: 310, block_reach: 306, goals: 'Reforçar estabilidade no passe de saques viagem potentes.', laterality: 'Destro', practice_time: '4 anos' }] },
+      { id: 'athlete-thiago-almeida', name: 'Thiago Almeida', email: 'thiago.almeida@ifal.edu.br', avatar_url: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=150&auto=format&fit=crop&q=80', position: 'Oposto', birth_date: '2003-07-19', serve_types: ['Viagem', 'Híbrido'], bio_goals: 'Ser a referência na saída de rede nos momentos de bola alta, potência no saque viagem acima de 100km/h.', laterality: 'Canhoto', practice_time: '7 anos', evaluations: [{ date: '2025-08-25', weight: 90.0, height: 198, standingReach: 254, jumpingReach: 338, wingspan: 204, seated_height: 102, attack_reach: 346, block_reach: 342, goals: 'Ganho de potência no salto e resistência física para jogos de 5 sets.', laterality: 'Canhoto', practice_time: '7 anos' }, { date: '2026-02-22', weight: 91.5, height: 198, standingReach: 254, jumpingReach: 348, wingspan: 205, seated_height: 102, attack_reach: 356, block_reach: 352, goals: 'Superar os 350cm de alcance e calibrar diagonal curta na saída.', laterality: 'Canhoto', practice_time: '7 anos' }] },
+    ]
+
+    const now = new Date().toISOString()
+    for (const a of initialAthletes) {
+      const slug = await generateCardSlugSupabase(a.name)
+      await sb.from('users').insert({ id: a.id, email: a.email.toLowerCase(), password_hash: defaultPasswordHash, name: a.name, avatar_url: a.avatar_url, created_at: now })
+      await sb.from('profiles').insert({ user_id: a.id, full_name: a.name, birth_date: a.birth_date, preferred_position: a.position, laterality: a.laterality, practice_time: a.practice_time, serve_types: a.serve_types, bio_goals: a.bio_goals, show_weight: true, show_height: true, show_reach: true, show_wingspan: true, show_goals: true, show_evaluations: true, show_in_rankings: true, public_card_enabled: false, public_card_slug: slug, updated_at: now })
+      for (let i = 0; i < a.evaluations.length; i++) {
+        const ev = a.evaluations[i]
+        const metrics = calculateAllMetricsSupabase(a.birth_date, ev.weight, ev.height, ev.standingReach, ev.jumpingReach, ev.date, ev.attack_reach, ev.block_reach)
+        await sb.from('evaluations').insert({ id: `eval-${a.id}-${i + 1}`, user_id: a.id, evaluation_date: ev.date, full_name: a.name, birth_date: a.birth_date, age: metrics.age, weight: ev.weight, height: ev.height, reach_standing: ev.standingReach, reach_jumping: ev.jumpingReach, wingspan: ev.wingspan, seated_height: ev.seated_height, attack_reach: ev.attack_reach, block_reach: ev.block_reach, laterality: ev.laterality, practice_time: ev.practice_time, vertical_jump: metrics.vertical_jump, bmi: metrics.bmi, position: a.position, serve_types: a.serve_types, goals: ev.goals, notes: 'Avaliação periódica de desempenho esportivo.', created_at: now })
+      }
+    }
+  } catch (err) {
+    console.warn('ensureSeedDataSupabase error (ignored):', err)
   }
 }
 

@@ -26,7 +26,18 @@ export default function LoginPage() {
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await res.json();
+      let data: any = {};
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        throw new Error(
+          res.status >= 500
+            ? 'Erro no servidor ao autenticar. Tente novamente mais tarde.'
+            : text || 'Erro inesperado na resposta do servidor.'
+        );
+      }
 
       if (!res.ok) {
         throw new Error(data.error || 'Falha ao autenticar.');

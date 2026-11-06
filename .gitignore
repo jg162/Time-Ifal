@@ -40,3 +40,4 @@ next-env.d.ts
 
 # scratch kit separado do projeto principal
 volley-performance/
+.env*
