@@ -26,6 +26,9 @@ yarn-error.log*
 .env*.local
 .env
 
+# sqlite database (per-user local storage, never commit binaries)
+data/
+
 # vercel
 .vercel
 
