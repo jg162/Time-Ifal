@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
     }
 
-    const evaluations = getEvaluationsByUserId(user.id);
+    const evaluations = await getEvaluationsByUserId(user.id);
     return NextResponse.json({ evaluations });
   } catch (err: any) {
     console.error('Get evaluations error:', err);
@@ -132,7 +132,7 @@ export async function POST(request: NextRequest) {
 
     const goalsText = goals ? goals.trim() : '';
 
-    const newEval = createEvaluation({
+    const newEval = await createEvaluation({
       id: evalId,
       user_id: user.id,
       evaluation_date,
@@ -158,12 +158,12 @@ export async function POST(request: NextRequest) {
     });
 
     // Metas mensuráveis passam a refletir automaticamente a avaliação mais recente.
-    syncGoalsWithLatestEvaluation(user.id);
+    await syncGoalsWithLatestEvaluation(user.id);
 
     // Desbloqueio automático de conquistas (1ª avaliação, recordes, etc.)
     const { unlockedNow } = await evaluateAchievements(user.id, {
-      evaluations: getEvaluationsByUserId(user.id),
-      goals: getGoalsByUserId(user.id),
+      evaluations: await getEvaluationsByUserId(user.id),
+      goals: await getGoalsByUserId(user.id),
     });
 
     return NextResponse.json({

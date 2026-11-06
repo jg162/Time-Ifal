@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const user = getUserByEmail(email.trim());
+    const user = await getUserByEmail(email.trim());
     if (!user) {
       // Don't leak user existence or give polite notice
       return NextResponse.json({
@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
 
     // Generate 6 digit verification code
     const code = Math.floor(100000 + Math.random() * 900000).toString();
-    createPasswordResetToken(user.email, code);
+    await createPasswordResetToken(user.email, code);
 
     // Return the code in the response for seamless testing/demonstration
     return NextResponse.json({

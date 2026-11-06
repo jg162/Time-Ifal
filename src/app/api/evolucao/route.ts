@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
     }
 
-    const evaluations = getEvaluationsByUserId(user.id); // histórico completo, preservado
+    const evaluations = await getEvaluationsByUserId(user.id); // histórico completo, preservado
     const periodParam = request.nextUrl.searchParams.get('periodo'); // meses: '' = tudo
 
     const evaluationsForPeriod = filterByPeriod(evaluations, periodParam ? parseInt(periodParam, 10) : null);

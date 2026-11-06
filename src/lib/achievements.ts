@@ -133,14 +133,14 @@ export async function evaluateAchievements(
   userId: string,
   context: { evaluations: Evaluation[]; goals: Goal[] }
 ): Promise<{ unlockedNow: AchievementKey[]; all: AchievementView[] }> {
-  const existing = getAchievementsByUserId(userId);
+  const existing = await getAchievementsByUserId(userId);
   const existingKeys = new Set(existing.map(a => a.key));
 
   const candidates = computeCandidateKeys(context);
   const newKeys = candidates.filter(k => !existingKeys.has(k));
 
   if (newKeys.length > 0) {
-    const justUnlocked = unlockAchievements(userId, newKeys);
+    const justUnlocked = await unlockAchievements(userId, newKeys);
     for (const u of justUnlocked) existing.push(u);
   }
 

@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     }
 
     const newPasswordHash = await hashPassword(newPassword);
-    const success = verifyAndUsePasswordReset(email.trim(), code.trim(), newPasswordHash);
+    const success = await verifyAndUsePasswordReset(email.trim(), code.trim(), newPasswordHash);
 
     if (!success) {
       return NextResponse.json(

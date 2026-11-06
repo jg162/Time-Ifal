@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     // Um atleta sempre pode se incluir na comparação mesmo com privacidade on.
     if (ids.length > 10) ids = ids.slice(0, 10);
 
-    const athletes = getAllTeamAthletes(currentUser?.id);
+    const athletes = await getAllTeamAthletes(currentUser?.id);
 
     const comparable: CompareAthlete[] = athletes
       .filter(a => (ids.length > 0 ? ids.includes(a.id) : true))

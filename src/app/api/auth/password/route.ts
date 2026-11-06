@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'A nova senha deve ser diferente da senha atual.' }, { status: 400 });
     }
 
-    const fullUser = getUserByEmail(user.email);
+    const fullUser = await getUserByEmail(user.email);
     if (!fullUser) {
       return NextResponse.json({ error: 'Conta não encontrada.' }, { status: 404 });
     }
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     }
 
     const hash = await hashPassword(newPassword); // nunca armazenamos a senha em texto
-    updateUserPassword(fullUser.id, hash);
+    await updateUserPassword(fullUser.id, hash);
 
     return NextResponse.json({ success: true, message: 'Senha alterada com sucesso!' });
   } catch (err: any) {

@@ -11,11 +11,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
     }
 
-    const profile = getProfileByUserId(user.id);
-    const evaluations = getEvaluationsByUserId(user.id);
+    const profile = await getProfileByUserId(user.id);
+    const evaluations = await getEvaluationsByUserId(user.id);
     const latestEvaluation = evaluations.length > 0 ? evaluations[evaluations.length - 1] : null;
-    const goals = getGoalsByUserId(user.id);
-    const unlockedAchievements = getAchievementsByUserId(user.id);
+    const goals = await getGoalsByUserId(user.id);
+    const unlockedAchievements = await getAchievementsByUserId(user.id);
 
     return NextResponse.json({
       profile,
@@ -43,13 +43,13 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const profile = getProfileByUserId(user.id);
+    const profile = await getProfileByUserId(user.id);
     if (!profile) {
       return NextResponse.json({ error: 'Perfil não encontrado.' }, { status: 404 });
     }
 
     const profileUpdate = (await import('@/lib/db')).updateProfile;
-    const updated = profileUpdate(user.id, {
+    const updated = await profileUpdate(user.id, {
       public_card_enabled: Boolean(body.public_card_enabled),
       ...(body.public_card_slug !== undefined && body.public_card_slug !== null
         ? { public_card_slug: body.public_card_slug }

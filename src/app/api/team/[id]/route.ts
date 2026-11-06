@@ -10,7 +10,7 @@ export async function GET(
   try {
     await ensureSeedData();
     const currentUser = await getCurrentUserFromRequest(request);
-    const details = getAthleteDetails(params.id, currentUser?.id);
+    const details = await getAthleteDetails(params.id, currentUser?.id);
 
     if (!details) {
       return NextResponse.json({ error: 'Atleta não encontrado no time.' }, { status: 404 });

@@ -14,8 +14,8 @@ export async function GET(request: NextRequest) {
 
     // Recalcula automaticamente os critérios de desbloqueio ao acessar a página.
     const { all, unlockedNow } = await evaluateAchievements(user.id, {
-      evaluations: getEvaluationsByUserId(user.id),
-      goals: getGoalsByUserId(user.id),
+      evaluations: await getEvaluationsByUserId(user.id),
+      goals: await getGoalsByUserId(user.id),
     });
 
     return NextResponse.json({ achievements: all, unlockedNow });

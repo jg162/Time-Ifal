@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const existingUser = getUserByEmail(email);
+    const existingUser = await getUserByEmail(email);
     if (existingUser) {
       return NextResponse.json(
         { error: 'Este e-mail já está cadastrado na plataforma.' },
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     const passwordHash = await hashPassword(password);
     const userId = 'usr_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
 
-    const newUser = createUser({
+    const newUser = await createUser({
       id: userId,
       email: email.trim().toLowerCase(),
       name: name.trim(),

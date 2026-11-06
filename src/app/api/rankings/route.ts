@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
 
     const rankings: Record<string, unknown> = {};
     for (const field of fields) {
-      rankings[field] = getRanking(field, 100);
+      rankings[field] = await getRanking(field, 100);
     }
 
     return NextResponse.json({

@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const user = getUserByEmail(email.trim());
+    const user = await getUserByEmail(email.trim());
     if (!user) {
       return NextResponse.json(
         { error: 'Credenciais inválidas. Verifique seu e-mail e senha.' },
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     }
 
     const token = signToken(user);
-    const profile = getProfileByUserId(user.id);
+    const profile = await getProfileByUserId(user.id);
 
     const response = NextResponse.json({
       success: true,

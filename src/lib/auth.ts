@@ -77,11 +77,11 @@ export async function getCurrentUserFromRequest(request: NextRequest): Promise<U
   const payload = verifyToken(token);
   if (!payload || !payload.id) return null;
 
-  return getUserById(payload.id);
+  return await getUserById(payload.id);
 }
 
 export async function verifyCredentials(email: string, password: string): Promise<null | User & { password_hash: string }> {
-  const user = getUserByEmail(email);
+  const user = await getUserByEmail(email);
   if (!user) return null;
   const ok = await comparePassword(password, user.password_hash);
   return ok ? user : null;

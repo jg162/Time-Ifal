@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
     }
 
-    const profile = getProfileByUserId(user.id);
+    const profile = await getProfileByUserId(user.id);
     return NextResponse.json({ user, profile });
   } catch (err: any) {
     console.error('Get profile error:', err);
@@ -27,7 +27,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const updatedProfile = updateProfile(user.id, body);
+    const updatedProfile = await updateProfile(user.id, body);
 
     return NextResponse.json({
       success: true,

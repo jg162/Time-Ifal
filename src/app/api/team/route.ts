@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
   try {
     await ensureSeedData();
     const currentUser = await getCurrentUserFromRequest(request);
-    const athletes = getAllTeamAthletes(currentUser?.id);
+    const athletes = await getAllTeamAthletes(currentUser?.id);
 
     return NextResponse.json({
       athletes,

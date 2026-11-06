@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
     }
-    const goals = getGoalsByUserId(user.id);
+    const goals = await getGoalsByUserId(user.id);
     return NextResponse.json({ goals });
   } catch (err: any) {
     console.error('Get goals error:', err);
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Data de prazo inválida.' }, { status: 400 });
     }
 
-    const goal = createGoal(user.id, {
+    const goal = await createGoal(user.id, {
       title: title.trim(),
       description: typeof description === 'string' ? description : '',
       metric_type: metric_type || null,
@@ -71,10 +71,10 @@ export async function POST(request: NextRequest) {
     }
 
     // A primeira meta criada desbloqueia uma conquista.
-    const goals = getGoalsByUserId(user.id);
+    const allGoals = await getGoalsByUserId(user.id);
     const { unlockedNow } = await evaluateAchievements(user.id, {
-      evaluations: getEvaluationsByUserId(user.id),
-      goals,
+      evaluations: await getEvaluationsByUserId(user.id),
+      goals: allGoals,
     });
 
     return NextResponse.json({

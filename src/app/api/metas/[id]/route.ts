@@ -37,7 +37,7 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
       return NextResponse.json({ error: 'Informe um título para a meta.' }, { status: 400 });
     }
 
-    const goal = updateGoal(params.id, user.id, {
+    const goal = await updateGoal(params.id, user.id, {
       title,
       description: typeof description === 'string' ? description : undefined,
       metric_type: metric_type === '' ? null : metric_type,
@@ -53,8 +53,8 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
     }
 
     const { unlockedNow } = await evaluateAchievements(user.id, {
-      evaluations: getEvaluationsByUserId(user.id),
-      goals: getGoalsByUserId(user.id),
+      evaluations: await getEvaluationsByUserId(user.id),
+      goals: await getGoalsByUserId(user.id),
     });
 
     return NextResponse.json({
@@ -76,7 +76,7 @@ export async function DELETE(request: NextRequest, { params }: Ctx) {
       return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
     }
 
-    const success = deleteGoal(params.id, user.id); // RLS: apenas o dono pode excluir
+    const success = await deleteGoal(params.id, user.id); // RLS: apenas o dono pode excluir
     if (!success) {
       return NextResponse.json({ error: 'Meta não encontrada.' }, { status: 404 });
     }

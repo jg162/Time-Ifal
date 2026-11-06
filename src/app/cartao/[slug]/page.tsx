@@ -22,7 +22,7 @@ interface CartaoPageProps {
 }
 
 export async function generateMetadata({ params }: CartaoPageProps): Promise<Metadata> {
-  const data = getPublicCardBySlug(params.slug);
+  const data = await getPublicCardBySlug(params.slug);
   return {
     title: data
       ? `${data.name} • Carteirinha TIME IFAL · VOLLEY PERFORMANCE`
@@ -30,8 +30,8 @@ export async function generateMetadata({ params }: CartaoPageProps): Promise<Met
   };
 }
 
-export default function CartaoPublicoPage({ params }: CartaoPageProps) {
-  const data = getPublicCardBySlug(params.slug);
+export default async function CartaoPublicoPage({ params }: CartaoPageProps) {
+  const data = await getPublicCardBySlug(params.slug);
   if (!data) notFound();
 
   const athlete = data as AthleteCardData & { slug: string };

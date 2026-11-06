@@ -12,7 +12,7 @@ export async function GET(
       return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
     }
 
-    const evaluation = getEvaluationById(params.id, user.id);
+    const evaluation = await getEvaluationById(params.id, user.id);
     if (!evaluation) {
       return NextResponse.json({ error: 'Avaliação não encontrada.' }, { status: 404 });
     }
@@ -34,7 +34,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
     }
 
-    const success = deleteEvaluation(params.id, user.id);
+    const success = await deleteEvaluation(params.id, user.id);
     if (!success) {
       return NextResponse.json(
         { error: 'Avaliação não encontrada ou você não tem permissão para excluí-la.' },
