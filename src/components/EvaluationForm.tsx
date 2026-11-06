@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { POSITIONS, SERVE_TYPES, Position, ServeType } from '@/lib/types';
+import { POSITIONS, SERVE_TYPES, LATERALITIES, Position, ServeType, Laterality } from '@/lib/types';
 import { calculateAge, calculateVerticalJump, calculateBMI, getBMICategory, getJumpCategory } from '@/lib/calculations';
 import { 
   Save, 
@@ -26,6 +26,8 @@ interface EvaluationFormProps {
     position?: Position;
     serve_types?: ServeType[];
     goals?: string;
+    laterality?: Laterality | null;
+    practice_time?: string;
   };
   onSuccess?: () => void;
 }
@@ -44,8 +46,13 @@ export default function EvaluationForm({ initialData, onSuccess }: EvaluationFor
   const [reachStanding, setReachStanding] = useState<string>('');
   const [reachJumping, setReachJumping] = useState<string>('');
   const [wingspan, setWingspan] = useState<string>('');
+  const [seatedHeight, setSeatedHeight] = useState<string>('');
+  const [attackReach, setAttackReach] = useState<string>('');
+  const [blockReach, setBlockReach] = useState<string>('');
   const [position, setPosition] = useState<Position>(initialData?.position || 'Ponteiro');
   const [serveTypes, setServeTypes] = useState<ServeType[]>(initialData?.serve_types || ['Flutuante pulando']);
+  const [laterality, setLaterality] = useState<Laterality | null>(initialData?.laterality ?? null);
+  const [practiceTime, setPracticeTime] = useState<string>(initialData?.practice_time || '');
   const [goals, setGoals] = useState<string>(initialData?.goals || '');
   const [notes, setNotes] = useState<string>('');
 
@@ -58,6 +65,9 @@ export default function EvaluationForm({ initialData, onSuccess }: EvaluationFor
   const calculatedAge = calculateAge(birthDate, evaluationDate);
   const numStanding = parseFloat(reachStanding) || 0;
   const numJumping = parseFloat(reachJumping) || 0;
+  const numSeated = parseFloat(seatedHeight) || 0;
+  const numAttack = parseFloat(attackReach) || 0;
+  const numBlock = parseFloat(blockReach) || 0;
   const calculatedVerticalJump = calculateVerticalJump(numStanding, numJumping);
   const numWeight = parseFloat(weight) || 0;
   const numHeight = parseFloat(height) || 0;
@@ -112,6 +122,18 @@ export default function EvaluationForm({ initialData, onSuccess }: EvaluationFor
       setErrorMessage('Por favor, informe a envergadura em cm.');
       return;
     }
+    if (seatedHeight.trim() && numSeated <= 0) {
+      setErrorMessage('Por favor, informe uma altura sentado válida em cm.');
+      return;
+    }
+    if (attackReach.trim() && numAttack <= 0) {
+      setErrorMessage('Por favor, informe um alcance de ataque válido em cm.');
+      return;
+    }
+    if (blockReach.trim() && numBlock <= 0) {
+      setErrorMessage('Por favor, informe um alcance de bloqueio válido em cm.');
+      return;
+    }
     if (serveTypes.length === 0) {
       setErrorMessage('Selecione ao menos um tipo de saque que você pratica.');
       return;
@@ -132,6 +154,11 @@ export default function EvaluationForm({ initialData, onSuccess }: EvaluationFor
           reach_standing: numStanding,
           reach_jumping: numJumping,
           wingspan: parseFloat(wingspan),
+          seated_height: numSeated > 0 ? numSeated : null,
+          attack_reach: numAttack > 0 ? numAttack : null,
+          block_reach: numBlock > 0 ? numBlock : null,
+          laterality: laterality ?? null,
+          practice_time: practiceTime.trim(),
           position,
           serve_types: serveTypes,
           goals: goals.trim(),
@@ -390,6 +417,85 @@ export default function EvaluationForm({ initialData, onSuccess }: EvaluationFor
             </div>
             <p className="text-[11px] text-emerald-400/70 mt-1">Ponto mais alto tocado com corrida de ataque ou salto do bloqueio.</p>
           </div>
+
+          {/* Altura Sentado (Opcional) */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">
+              Altura Sentado (cm)
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                step="0.5"
+                min="60"
+                max="130"
+                placeholder="Ex: 100"
+                value={seatedHeight}
+                onChange={(e) => setSeatedHeight(e.target.value)}
+                className="w-full bg-[#080c09] border border-emerald-950/80 focus:border-emerald-500 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-colors font-mono"
+              />
+              <span className="absolute right-4 top-3 text-xs font-bold text-gray-500">cm</span>
+            </div>
+            <p className="text-[11px] text-gray-500 mt-1">Da superfície do banco ao topo da cabeça, sentado ereto (opcional).</p>
+          </div>
+
+          {/* Alcance de Ataque (Novo campo voleibol) */}
+          <div>
+            <label className={`block text-xs font-semibold uppercase tracking-wider mb-2 flex items-center gap-1.5 ${
+              attackReach ? 'text-emerald-400' : 'text-gray-300'
+            }`}>
+              <Zap className="w-3.5 h-3.5" /> Alcance de Ataque (cm)
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                step="0.5"
+                min="100"
+                max="420"
+                placeholder="Ex: 350"
+                value={attackReach}
+                onChange={(e) => setAttackReach(e.target.value)}
+                className={`w-full rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 transition-colors font-mono ${
+                  attackReach
+                    ? 'bg-[#09120c] border border-emerald-500/50 focus:border-emerald-400 text-white font-bold shadow-neon focus:ring-emerald-400'
+                    : 'bg-[#080c09] border border-emerald-950/80 focus:border-emerald-500 text-white focus:ring-emerald-500'
+                }`}
+              />
+              <span className={`absolute right-4 top-3 text-xs font-bold ${attackReach ? 'text-emerald-400' : 'text-gray-500'}`}>cm</span>
+            </div>
+            <p className={`text-[11px] mt-1 ${attackReach ? 'text-emerald-400/70' : 'text-gray-500'}`}>
+              Toque máximo na bola com corrida de ataque (opcional).
+            </p>
+          </div>
+
+          {/* Alcance de Bloqueio (Novo campo voleibol) */}
+          <div>
+            <label className={`block text-xs font-semibold uppercase tracking-wider mb-2 flex items-center gap-1.5 ${
+              blockReach ? 'text-emerald-400' : 'text-gray-300'
+            }`}>
+              <Zap className="w-3.5 h-3.5" /> Alcance de Bloqueio (cm)
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                step="0.5"
+                min="100"
+                max="420"
+                placeholder="Ex: 346"
+                value={blockReach}
+                onChange={(e) => setBlockReach(e.target.value)}
+                className={`w-full rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 transition-colors font-mono ${
+                  blockReach
+                    ? 'bg-[#09120c] border border-emerald-500/50 focus:border-emerald-400 text-white font-bold shadow-neon focus:ring-emerald-400'
+                    : 'bg-[#080c09] border border-emerald-950/80 focus:border-emerald-500 text-white focus:ring-emerald-500'
+                }`}
+              />
+              <span className={`absolute right-4 top-3 text-xs font-bold ${blockReach ? 'text-emerald-400' : 'text-gray-500'}`}>cm</span>
+            </div>
+            <p className={`text-[11px] mt-1 ${blockReach ? 'text-emerald-400/70' : 'text-gray-500'}`}>
+              Toque máximo acima da rede com os dois braços erguidos (opcional).
+            </p>
+          </div>
         </div>
 
         {/* CÁLCULOS AUTOMÁTICOS EM TEMPO REAL */}
@@ -467,30 +573,72 @@ export default function EvaluationForm({ initialData, onSuccess }: EvaluationFor
           </div>
         </div>
 
-        {/* Posição Seleção */}
-        <div className="mb-6">
-          <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-3">
-            Posição Principal em Quadra *
-          </label>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-            {POSITIONS.map((pos) => {
-              const isSelected = position === pos;
-              return (
-                <button
-                  key={pos}
-                  type="button"
-                  onClick={() => setPosition(pos)}
-                  className={`py-3 px-3 rounded-xl text-xs font-bold transition-all border text-center ${
-                    isSelected
-                      ? 'bg-emerald-500 text-black border-emerald-400 shadow-neon scale-[1.02]'
-                      : 'bg-[#080c09] text-gray-300 border-emerald-950/80 hover:border-emerald-500/40 hover:text-white'
-                  }`}
-                >
-                  {pos}
-                </button>
-              );
-            })}
+        {/* Posição + Lateralidade + Tempo de Prática */}
+        <div className="mb-6 grid grid-cols-1 sm:grid-cols-3 gap-5 items-end">
+          <div className="sm:col-span-2">
+            <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-3">
+              Posição Principal em Quadra *
+            </label>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+              {POSITIONS.map((pos) => {
+                const isSelected = position === pos;
+                return (
+                  <button
+                    key={pos}
+                    type="button"
+                    onClick={() => setPosition(pos)}
+                    className={`py-3 px-3 rounded-xl text-xs font-bold transition-all border text-center ${
+                      isSelected
+                        ? 'bg-emerald-500 text-black border-emerald-400 shadow-neon scale-[1.02]'
+                        : 'bg-[#080c09] text-gray-300 border-emerald-950/80 hover:border-emerald-500/40 hover:text-white'
+                    }`}
+                  >
+                    {pos}
+                  </button>
+                );
+              })}
+            </div>
           </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-3">
+              Lateralidade de Jogo
+            </label>
+            <div className="grid grid-cols-3 gap-3">
+              {LATERALITIES.map((lat) => {
+                const isSelected = laterality === lat;
+                return (
+                  <button
+                    key={lat}
+                    type="button"
+                    onClick={() => setLaterality(lat)}
+                    className={`py-3 px-3 rounded-xl text-xs font-bold transition-all border text-center ${
+                      isSelected
+                        ? 'bg-emerald-500 text-black border-emerald-400 shadow-neon scale-[1.02]'
+                        : 'bg-[#080c09] text-gray-300 border-emerald-950/80 hover:border-emerald-500/40 hover:text-white'
+                    }`}
+                  >
+                    {lat}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Tempo de Prática */}
+        <div className="mb-6">
+          <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">
+            Tempo de Prática do Voleibol
+          </label>
+          <input
+            type="text"
+            placeholder="Ex: 3 anos"
+            value={practiceTime}
+            onChange={(e) => setPracticeTime(e.target.value)}
+            className="w-full bg-[#080c09] border border-emerald-950/80 focus:border-emerald-500 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-colors"
+          />
+          <p className="text-[11px] text-gray-500 mt-1">Há quanto tempo você joga vôlei (ex: "3 anos", "desde 2021").</p>
         </div>
 
         {/* Tipo de Saque (Multi-select) */}

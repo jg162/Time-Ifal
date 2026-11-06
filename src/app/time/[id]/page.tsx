@@ -142,7 +142,7 @@ export default function AthleteProfilePage() {
                 <p className="text-xs sm:text-sm text-gray-300 flex flex-wrap items-center gap-3">
                   <span>{athlete.age ? `${athlete.age} anos` : 'Idade ñ informada'}</span>
                   <span>•</span>
-                  <span className="text-emerald-400 font-semibold">Time IFAL de Vôlei</span>
+                  <span className="text-emerald-400 font-semibold">TIME IFAL · VOLLEY PERFORMANCE</span>
                   {athlete.last_updated && (
                     <>
                       <span>•</span>

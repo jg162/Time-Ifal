@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import Navbar from '@/components/Navbar';
-import { User, Profile, Position, POSITIONS, SERVE_TYPES, ServeType } from '@/lib/types';
+import { User, Profile, Position, POSITIONS, SERVE_TYPES, ServeType, LATERALITIES, Laterality } from '@/lib/types';
 import { 
   User as UserIcon, 
   Save, 
@@ -39,6 +39,8 @@ export default function PerfilPage() {
   const [fullName, setFullName] = useState('');
   const [birthDate, setBirthDate] = useState('');
   const [position, setPosition] = useState<Position>('Ponteiro');
+  const [laterality, setLaterality] = useState<Laterality | null>(null);
+  const [practiceTime, setPracticeTime] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
   const [serveTypes, setServeTypes] = useState<ServeType[]>(['Flutuante pulando']);
   const [bioGoals, setBioGoals] = useState('');
@@ -62,6 +64,8 @@ export default function PerfilPage() {
         setFullName(data.profile?.full_name || data.user.name || '');
         setBirthDate(data.profile?.birth_date || '');
         setPosition(data.profile?.preferred_position || 'Ponteiro');
+        setLaterality(data.profile?.laterality ?? null);
+        setPracticeTime(data.profile?.practice_time || '');
         setAvatarUrl(data.user.avatar_url || '');
         setServeTypes(data.profile?.serve_types || ['Flutuante pulando']);
         setBioGoals(data.profile?.bio_goals || '');
@@ -98,6 +102,8 @@ export default function PerfilPage() {
           full_name: fullName,
           birth_date: birthDate,
           preferred_position: position,
+          laterality: laterality ?? undefined,
+          practice_time: practiceTime,
           avatar_url: avatarUrl,
           serve_types: serveTypes,
           bio_goals: bioGoals,
@@ -273,6 +279,37 @@ export default function PerfilPage() {
                       </option>
                     ))}
                   </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">
+                    Lateralidade de Jogo
+                  </label>
+                  <select
+                    value={laterality || ''}
+                    onChange={(e) => setLaterality((e.target.value || null) as Laterality | null)}
+                    className="w-full bg-[#080c09] border border-emerald-950/80 focus:border-emerald-500 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  >
+                    <option value="">Não informado</option>
+                    {LATERALITIES.map((lat) => (
+                      <option key={lat} value={lat}>
+                        {lat}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">
+                    Tempo de Prática do Voleibol
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex: 3 anos"
+                    value={practiceTime}
+                    onChange={(e) => setPracticeTime(e.target.value)}
+                    className="w-full bg-[#080c09] border border-emerald-950/80 focus:border-emerald-500 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  />
                 </div>
               </div>
 

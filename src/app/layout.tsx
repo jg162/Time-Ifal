@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'TIME IFAL | Plataforma de Avaliação de Atletas de Vôlei',
+  title: 'VOLLEY PERFORMANCE · TIME IFAL | Avaliação de Atletas de Voleibol',
   description: 'Sistema completo e moderno para avaliação física, acompanhamento de evolução e análise técnica de atletas de voleibol.',
 };
 

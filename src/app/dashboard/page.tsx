@@ -9,19 +9,22 @@ import MetricCard from '@/components/MetricCard';
 import EvolutionCharts from '@/components/EvolutionCharts';
 import { User, Profile, Evaluation } from '@/lib/types';
 import { getBMICategory, getJumpCategory } from '@/lib/calculations';
-import { 
-  Zap, 
-  Ruler, 
-  Weight, 
-  Maximize2, 
-  Calendar, 
-  Target, 
-  PlusCircle, 
-  Users, 
-  TrendingUp, 
+import {
+  Zap,
+  Ruler,
+  Weight,
+  Maximize2,
+  Calendar,
+  Target,
+  PlusCircle,
+  Users,
+  TrendingUp,
   ShieldAlert,
   ArrowRight,
-  Award
+  Award,
+  ClipboardList,
+  Trophy,
+  ArrowLeftRight
 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -127,7 +130,7 @@ export default function DashboardPage() {
                   </div>
 
                   <p className="text-xs sm:text-sm text-gray-300 flex flex-wrap items-center gap-x-3 gap-y-1">
-                    <span className="text-emerald-400 font-semibold">Time IFAL de Voleibol</span>
+                    <span className="text-emerald-400 font-semibold">TIME IFAL · VOLLEY PERFORMANCE</span>
                     <span>•</span>
                     <span>{latestEval?.age ? `${latestEval.age} anos` : 'Idade pendente'}</span>
                     <span>•</span>
@@ -156,6 +159,87 @@ export default function DashboardPage() {
                   <span>Ver Time</span>
                 </Link>
               </div>
+            </div>
+          </div>
+
+          {/* QUICK SHORTCUTS */}
+          <div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+              {/* Nova avaliação (destaque emerald) */}
+              <Link
+                href="/avaliacao"
+                className="rounded-2xl p-4 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/40 hover:border-emerald-400/60 transition-all"
+              >
+                <div className="p-2 w-fit rounded-lg bg-emerald-500 text-black shadow-neon mb-3">
+                  <PlusCircle className="w-4 h-4" />
+                </div>
+                <p className="text-xs font-bold text-emerald-300">Nova avaliação</p>
+              </Link>
+
+              {/* Histórico */}
+              <Link
+                href="/avaliacoes"
+                className="rounded-2xl p-4 bg-white/[0.03] hover:bg-white/[0.06] border border-emerald-950 hover:border-emerald-500/40 transition-all group"
+              >
+                <div className="p-2 w-fit rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 mb-3">
+                  <ClipboardList className="w-4 h-4" />
+                </div>
+                <p className="text-xs font-semibold text-gray-300 group-hover:text-white">
+                  Histórico
+                </p>
+              </Link>
+
+              {/* Time */}
+              <Link
+                href="/time"
+                className="rounded-2xl p-4 bg-white/[0.03] hover:bg-white/[0.06] border border-emerald-950 hover:border-emerald-500/40 transition-all group"
+              >
+                <div className="p-2 w-fit rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 mb-3">
+                  <Users className="w-4 h-4" />
+                </div>
+                <p className="text-xs font-semibold text-gray-300 group-hover:text-white">
+                  Time
+                </p>
+              </Link>
+
+              {/* Rankings */}
+              <Link
+                href="/rankings"
+                className="rounded-2xl p-4 bg-white/[0.03] hover:bg-white/[0.06] border border-emerald-950 hover:border-emerald-500/40 transition-all group"
+              >
+                <div className="p-2 w-fit rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 mb-3">
+                  <Trophy className="w-4 h-4" />
+                </div>
+                <p className="text-xs font-semibold text-gray-300 group-hover:text-white">
+                  Rankings
+                </p>
+              </Link>
+
+              {/* Comparar */}
+              <Link
+                href="/comparar"
+                className="rounded-2xl p-4 bg-white/[0.03] hover:bg-white/[0.06] border border-emerald-950 hover:border-emerald-500/40 transition-all group"
+              >
+                <div className="p-2 w-fit rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 mb-3">
+                  <ArrowLeftRight className="w-4 h-4" />
+                </div>
+                <p className="text-xs font-semibold text-gray-300 group-hover:text-white">
+                  Comparar
+                </p>
+              </Link>
+
+              {/* Metas */}
+              <Link
+                href="/metas"
+                className="rounded-2xl p-4 bg-white/[0.03] hover:bg-white/[0.06] border border-emerald-950 hover:border-emerald-500/40 transition-all group"
+              >
+                <div className="p-2 w-fit rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 mb-3">
+                  <Target className="w-4 h-4" />
+                </div>
+                <p className="text-xs font-semibold text-gray-300 group-hover:text-white">
+                  Metas
+                </p>
+              </Link>
             </div>
           </div>
 
@@ -305,7 +389,7 @@ export default function DashboardPage() {
               <div>
                 <h4 className="text-base font-bold text-white tracking-wide uppercase mb-4 pb-3 border-b border-emerald-950/60 flex items-center gap-2">
                   <Users className="w-5 h-5 text-emerald-400" />
-                  Elenco Time IFAL
+                  Elenco TIME IFAL · VOLLEY PERFORMANCE
                 </h4>
                 <p className="text-xs text-gray-300 leading-relaxed mb-4">
                   Acompanhe os alcances verticais, alturas e estatísticas físicas de todos os companheiros de equipe na área coletiva.
@@ -321,6 +405,18 @@ export default function DashboardPage() {
                       {latestEval?.position || profile?.preferred_position || 'Ponteiro'}
                     </span>
                   </div>
+                  {latestEval?.attack_reach != null && (
+                    <div className="flex items-center justify-between text-gray-300">
+                      <span>Alcance de ataque:</span>
+                      <span className="font-bold text-white font-mono">{latestEval.attack_reach} cm</span>
+                    </div>
+                  )}
+                  {latestEval?.block_reach != null && (
+                    <div className="flex items-center justify-between text-gray-300">
+                      <span>Alcance de bloqueio:</span>
+                      <span className="font-bold text-white font-mono">{latestEval.block_reach} cm</span>
+                    </div>
+                  )}
                 </div>
               </div>
 

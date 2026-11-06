@@ -72,7 +72,7 @@ export default function AthleteModal({ athlete, onClose, currentUserId }: Athlet
             <p className="text-sm text-gray-400 flex items-center gap-3">
               <span>{athlete.age ? `${athlete.age} anos` : 'Idade ñ informada'}</span>
               <span>•</span>
-              <span className="text-emerald-400/80 font-medium">Time IFAL de Vôlei</span>
+              <span className="text-emerald-400/80 font-medium">TIME IFAL · VOLLEY PERFORMANCE</span>
               {athlete.last_updated && (
                 <>
                   <span>•</span>

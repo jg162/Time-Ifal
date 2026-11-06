@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { Activity, ShieldCheck, Zap, TrendingUp, Users, ArrowRight } from 'lucide-react';
+import { ShieldCheck, Zap, TrendingUp, Users, ArrowRight } from 'lucide-react';
 
 export default function HomePage() {
   return (
@@ -10,13 +10,13 @@ export default function HomePage() {
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 p-0.5 shadow-neon flex items-center justify-center">
             <div className="w-full h-full bg-[#0a0d0b] rounded-[10px] flex items-center justify-center">
-              <Activity className="w-5 h-5 text-emerald-400" />
+              <Zap className="w-5 h-5 text-emerald-400" />
             </div>
           </div>
           <div>
             <div className="flex items-center gap-1.5">
-              <span className="font-black text-xl tracking-wider text-white">TIME</span>
-              <span className="font-black text-xl tracking-wider text-emerald-400">IFAL</span>
+              <span className="font-black text-xl tracking-wider text-white">VOLLEY</span>
+              <span className="font-black text-xl tracking-wider text-emerald-400">PERFORMANCE</span>
             </div>
             <p className="text-[10px] tracking-widest text-emerald-500/80 font-bold uppercase">
               Plataforma de Avaliação de Vôlei
@@ -98,7 +98,7 @@ export default function HomePage() {
             <div className="p-3 w-fit rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 mb-4">
               <Users className="w-6 h-6" />
             </div>
-            <h3 className="text-lg font-bold text-white mb-2">Área TIME Coletiva</h3>
+            <h3 className="text-lg font-bold text-white mb-2">Área Coletiva do Time</h3>
             <p className="text-sm text-gray-400 leading-relaxed">
               Visualização de todos os atletas do elenco, filtros por posição, ordenação por altura e impulsão, com respeito total à privacidade de cada jogador.
             </p>
@@ -108,7 +108,7 @@ export default function HomePage() {
 
       {/* Footer */}
       <footer className="py-6 border-t border-emerald-950/40 text-center text-xs text-gray-500">
-        <p>© 2026 Time IFAL de Voleibol. Plataforma de Rendimento e Avaliação Esportiva.</p>
+        <p>© 2026 VOLLEY PERFORMANCE · TIME IFAL. Plataforma de Rendimento e Avaliação Esportiva.</p>
       </footer>
     </div>
   );

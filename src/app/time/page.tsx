@@ -96,7 +96,7 @@ export default function TimePage() {
       <div className="min-h-screen bg-[#070908] flex items-center justify-center text-white">
         <div className="flex flex-col items-center gap-3">
           <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm font-semibold text-emerald-400">Carregando elenco do Time IFAL...</p>
+          <p className="text-sm font-semibold text-emerald-400">Carregando elenco do TIME IFAL · VOLLEY PERFORMANCE...</p>
         </div>
       </div>
     );
@@ -115,7 +115,7 @@ export default function TimePage() {
           onToggleSidebar={() => setSidebarOpen(true)}
           currentUser={currentUser}
           title="Time"
-          subtitle="Área coletiva dos atletas do Time IFAL de Voleibol"
+          subtitle="Área coletiva dos atletas do TIME IFAL · VOLLEY PERFORMANCE"
         />
 
         <main className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto w-full">

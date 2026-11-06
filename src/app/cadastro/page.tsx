@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Activity, Lock, Mail, User, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Zap, Lock, Mail, User, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -61,14 +61,17 @@ export default function RegisterPage() {
           <Link href="/" className="inline-flex items-center gap-3 group mb-4">
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-green-600 p-0.5 shadow-neon flex items-center justify-center">
               <div className="w-full h-full bg-[#0a0d0b] rounded-[14px] flex items-center justify-center">
-                <Activity className="w-6 h-6 text-emerald-400 group-hover:scale-110 transition-transform" />
+                <Zap className="w-6 h-6 text-emerald-400 group-hover:scale-110 transition-transform" />
               </div>
             </div>
             <div className="text-left">
               <div className="flex items-center gap-1.5">
-                <span className="font-black text-2xl tracking-wider text-white">TIME</span>
-                <span className="font-black text-2xl tracking-wider text-emerald-400">IFAL</span>
+                <span className="font-black text-2xl tracking-wider text-white">VOLLEY</span>
+                <span className="font-black text-2xl tracking-wider text-emerald-400">PERFORMANCE</span>
               </div>
+              <p className="text-[10px] tracking-widest text-emerald-500/80 font-bold uppercase">
+                Time IFAL · Vôlei de Alto Rendimento
+              </p>
               <p className="text-[10px] tracking-widest text-emerald-500/80 font-bold uppercase">
                 Cadastro de Atleta
               </p>

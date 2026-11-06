@@ -15,7 +15,10 @@ import {
   Save, 
   CheckCircle2, 
   AlertCircle,
-  Database
+  Database,
+  Link2,
+  Copy,
+  KeyRound
 } from 'lucide-react';
 
 export default function ConfiguracoesPage() {
@@ -37,6 +40,14 @@ export default function ConfiguracoesPage() {
   const [showWingspan, setShowWingspan] = useState(true);
   const [showGoals, setShowGoals] = useState(true);
   const [showEvaluations, setShowEvaluations] = useState(true);
+  const [showInRankings, setShowInRankings] = useState(true);
+
+  // Public card (carteirinha) state
+  const [publicCardEnabled, setPublicCardEnabled] = useState(false);
+  const [publicUrl, setPublicUrl] = useState<string | null>(null);
+  const [cardBusy, setCardBusy] = useState(false);
+  const [cardMessage, setCardMessage] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   // Password change state
   const [currentPassword, setCurrentPassword] = useState('');
@@ -67,6 +78,8 @@ export default function ConfiguracoesPage() {
           setShowWingspan(data.profile.show_wingspan ?? true);
           setShowGoals(data.profile.show_goals ?? true);
           setShowEvaluations(data.profile.show_evaluations ?? true);
+          setShowInRankings(data.profile.show_in_rankings !== false);
+          setPublicCardEnabled(Boolean(data.profile.public_card_enabled));
         }
 
         const evalRes = await fetch('/api/evaluations');
@@ -99,6 +112,7 @@ export default function ConfiguracoesPage() {
           show_wingspan: showWingspan,
           show_goals: showGoals,
           show_evaluations: showEvaluations,
+          show_in_rankings: showInRankings,
         }),
       });
 
@@ -132,19 +146,22 @@ export default function ConfiguracoesPage() {
     setChangingPassword(true);
 
     try {
-      // Use password recovery / reset endpoint or verify code
-      const res = await fetch('/api/auth/reset', {
+      const res = await fetch('/api/auth/password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: user?.email,
-          code: '000000', // direct change handled via profile or token
+          currentPassword,
           newPassword,
           confirmPassword,
         }),
       });
 
-      // Alternatively update via direct profile or password reset
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Erro ao alterar senha.');
+      }
+
       setPasswordSuccess('Senha alterada com sucesso!');
       setCurrentPassword('');
       setNewPassword('');
@@ -153,6 +170,47 @@ export default function ConfiguracoesPage() {
       setPasswordError(err.message || 'Erro ao alterar senha.');
     } finally {
       setChangingPassword(false);
+    }
+  };
+
+  const handleTogglePublicCard = async () => {
+    const next = !publicCardEnabled;
+    setCardBusy(true);
+    setCardMessage(null);
+    setCopied(false);
+
+    try {
+      const res = await fetch('/api/carteirinha', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ public_card_enabled: next }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Falha ao atualizar a carteirinha pública.');
+      }
+
+      setPublicCardEnabled(next);
+      setPublicUrl(next ? (data.publicUrl || `${window.location.origin}/carteirinha/${data.slug || ''}`) : null);
+      setCardMessage(next ? 'Link público ativado com sucesso!' : 'Link público desativado.');
+    } catch (err: any) {
+      setCardMessage(err.message || 'Erro ao atualizar a carteirinha pública.');
+    } finally {
+      setCardBusy(false);
+    }
+  };
+
+  const handleCopyLink = async () => {
+    if (!publicUrl) return;
+    try {
+      await navigator.clipboard.writeText(publicUrl);
+      setCopied(true);
+      setCardMessage('Link copiado para a área de transferência!');
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCardMessage('Não foi possível copiar o link automaticamente.');
     }
   };
 
@@ -169,7 +227,7 @@ export default function ConfiguracoesPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `time-ifal-avaliacoes-${user?.name?.toLowerCase().replace(/\s+/g, '-') || 'atleta'}.json`;
+    a.download = `volley-performance-time-ifal-avaliacoes-${user?.name?.toLowerCase().replace(/\s+/g, '-') || 'atleta'}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -351,6 +409,26 @@ export default function ConfiguracoesPage() {
                   />
                 </button>
               </div>
+              {/* Rankings Toggle */}
+              <div className="flex items-center justify-between p-3.5 rounded-xl bg-black/40 border border-emerald-950/80">
+                <div>
+                  <span className="text-sm font-bold text-white block">Aparecer nos Rankings</span>
+                  <span className="text-xs text-gray-400">Permite que seu nome e resultados apareçam nos rankings do time.</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowInRankings(!showInRankings)}
+                  className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors ${
+                    showInRankings ? 'bg-emerald-500' : 'bg-gray-800'
+                  }`}
+                >
+                  <div
+                    className={`bg-black w-4 h-4 rounded-full shadow-md transform transition-transform ${
+                      showInRankings ? 'translate-x-6' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
             </div>
 
             <div className="mt-6 flex justify-end">
@@ -364,6 +442,152 @@ export default function ConfiguracoesPage() {
                 <span>{savingPrivacy ? 'Salvando...' : 'Salvar Permissões de Privacidade'}</span>
               </button>
             </div>
+          </div>
+
+          {/* CARTEIRINHA PÚBLICA */}
+          <div className="athletic-card rounded-2xl p-6 sm:p-8">
+            <div className="flex items-center gap-3 mb-4 pb-4 border-b border-emerald-950/60">
+              <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <Link2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base sm:text-lg font-bold text-white tracking-wide uppercase">
+                  Carteirinha Pública
+                </h3>
+                <p className="text-xs text-gray-400">
+                  Ative um link público com sua carteirinha de atleta. Os dados exibidos respeitam as permissões de privacidade acima.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between p-3.5 rounded-xl bg-black/40 border border-emerald-950/80">
+              <div>
+                <span className="text-sm font-bold text-white block">Ativar link público da carteirinha</span>
+                <span className="text-xs text-gray-400">Qualquer pessoa com o link poderá ver seu cartão resumido.</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleTogglePublicCard}
+                disabled={cardBusy}
+                className={`w-12 h-6 flex-shrink-0 flex items-center rounded-full p-1 transition-colors disabled:opacity-50 ${
+                  publicCardEnabled ? 'bg-emerald-500' : 'bg-gray-800'
+                }`}
+              >
+                <div
+                  className={`bg-black w-4 h-4 rounded-full shadow-md transform transition-transform ${
+                    publicCardEnabled ? 'translate-x-6' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {publicCardEnabled && publicUrl && (
+              <div className="mt-4 p-3.5 rounded-xl bg-black/40 border border-emerald-500/30 flex flex-col sm:flex-row sm:items-center gap-3">
+                <div className="sm:flex-1 min-w-0">
+                  <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block mb-1">Seu link público</span>
+                  <p className="text-xs text-emerald-300 font-mono truncate">{publicUrl}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCopyLink}
+                  className="px-4 py-2 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-500/40 text-emerald-300 text-xs font-bold transition-all flex items-center justify-center gap-2 flex-shrink-0"
+                >
+                  {copied ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  <span>{copied ? 'Copiado!' : 'Copiar Link'}</span>
+                </button>
+              </div>
+            )}
+
+            {cardMessage && (
+              <p className="mt-3 text-xs text-emerald-400/80">{cardMessage}</p>
+            )}
+          </div>
+
+          {/* SEGURANÇA: ALTERAR SENHA */}
+          <div className="athletic-card rounded-2xl p-6 sm:p-8">
+            <div className="flex items-center gap-3 mb-4 pb-4 border-b border-emerald-950/60">
+              <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <KeyRound className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base sm:text-lg font-bold text-white tracking-wide uppercase">
+                  Segurança da Conta
+                </h3>
+                <p className="text-xs text-gray-400">
+                  Altere sua senha informando a senha atual. Mínimo de 6 dígitos.
+                </p>
+              </div>
+            </div>
+
+            {passwordSuccess && (
+              <div className="mb-4 p-4 rounded-xl bg-emerald-950/60 border border-emerald-500/50 flex items-center gap-3 text-emerald-300 text-sm">
+                <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+                <span>{passwordSuccess}</span>
+              </div>
+            )}
+
+            {passwordError && (
+              <div className="mb-4 p-4 rounded-xl bg-red-950/60 border border-red-500/50 flex items-center gap-3 text-red-300 text-sm">
+                <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+                <span>{passwordError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">
+                  Senha Atual
+                </label>
+                <input
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  required
+                  placeholder="••••••••"
+                  className="w-full bg-[#080c09] border border-emerald-950/80 focus:border-emerald-500 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-colors"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">
+                    Nova Senha
+                  </label>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    required
+                    placeholder="Mínimo de 6 dígitos"
+                    className="w-full bg-[#080c09] border border-emerald-950/80 focus:border-emerald-500 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">
+                    Confirmar Nova Senha
+                  </label>
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    placeholder="Repita a nova senha"
+                    className="w-full bg-[#080c09] border border-emerald-950/80 focus:border-emerald-500 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-colors"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={changingPassword}
+                  className="px-6 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-xs uppercase tracking-wider shadow-neon transition-all flex items-center gap-2 disabled:opacity-50"
+                >
+                  <Lock className="w-4 h-4" />
+                  <span>{changingPassword ? 'Alterando...' : 'Alterar Senha'}</span>
+                </button>
+              </div>
+            </form>
           </div>
 
           {/* BACKUP & DATA EXPORT */}
