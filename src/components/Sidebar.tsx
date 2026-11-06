@@ -53,6 +53,7 @@ export default function Sidebar({ currentUser, isOpen, onClose }: SidebarProps) 
       items: [
         { name: 'Início', href: '/dashboard', icon: Home },
         { name: 'Meu perfil', href: '/perfil', icon: User },
+        { name: 'Ficha técnica', href: '/ficha', icon: FileText },
         { name: 'Minhas avaliações', href: '/avaliacoes', icon: ClipboardList },
         { name: 'Minha evolução', href: '/evolucao', icon: TrendingUp },
         { name: 'Minhas metas', href: '/metas', icon: Target },

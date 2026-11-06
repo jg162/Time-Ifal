@@ -358,11 +358,27 @@ interface TeamMeta {
 
 function extractTeamMetaFromBio(bio?: string | null): { team: TeamMeta; cleanBio: string } | null {
   if (!bio) return null
-  const match = bio.match(/\[TEAM:(\{.*?\})\]/)
-  if (!match) return null
+  // Regex robusta: captura o bloco JSON balanceado após [TEAM:
+  const tagStart = bio.indexOf('[TEAM:{')
+  if (tagStart === -1) return null
+  const jsonStart = tagStart + 6 // posição do '{'
+  let depth = 0
+  let jsonEnd = -1
+  for (let i = jsonStart; i < bio.length; i++) {
+    if (bio[i] === '{') depth++
+    else if (bio[i] === '}') {
+      depth--
+      if (depth === 0) { jsonEnd = i; break }
+    }
+  }
+  if (jsonEnd === -1) return null
+  // Verifica que termina com ']'
+  if (bio[jsonEnd + 1] !== ']') return null
+  const jsonStr = bio.substring(jsonStart, jsonEnd + 1)
+  const fullTag = bio.substring(tagStart, jsonEnd + 2) // inclui ']'
   try {
-    const meta = JSON.parse(match[1]) as TeamMeta
-    const cleanBio = bio.replace(match[0], '').trim()
+    const meta = JSON.parse(jsonStr) as TeamMeta
+    const cleanBio = bio.replace(fullTag, '').trim()
     return { team: meta, cleanBio }
   } catch {
     return null
@@ -373,14 +389,16 @@ export async function createTeam(name: string, description = '', createdByUserId
   if (!isSupabase()) throw new Error('createTeam via Supabase não disponível localmente')
   const sb = getSupabase()!
   const id = 'team_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36)
-  const prefix = name.replace(/[^a-zA-Z]/g, '').substring(0, 4).toUpperCase() || 'TIME'
+  const prefix = name.replace(/[^a-zA-ZÀ-ÿ]/g, '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z]/g, '').substring(0, 4).toUpperCase() || 'TIME'
   const rand = Math.floor(1000 + Math.random() * 9000)
   const code = `${prefix}-${rand}`
   const now = new Date().toISOString()
 
-  // 1. Tenta inserir na tabela 'teams' caso exista
+  let insertedInTable = false
+
+  // 1. Tenta inserir na tabela 'teams'
   try {
-    const { error } = await sb.from('teams').insert({
+    const { error: teamErr } = await sb.from('teams').insert({
       id,
       name: name.trim(),
       code,
@@ -388,29 +406,65 @@ export async function createTeam(name: string, description = '', createdByUserId
       created_by: createdByUserId || null,
       created_at: now
     })
-    if (!error && createdByUserId) {
-      await sb.from('team_members').insert({
-        id: 'tm_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36),
-        team_id: id,
-        user_id: createdByUserId,
-        role: 'capitao',
-        joined_at: now
-      })
+    if (teamErr) {
+      console.warn('createTeam teams table error (may not exist yet):', teamErr.message)
+    } else {
+      insertedInTable = true
+      if (createdByUserId) {
+        const { error: memberErr } = await sb.from('team_members').insert({
+          id: 'tm_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36),
+          team_id: id,
+          user_id: createdByUserId,
+          role: 'capitao',
+          joined_at: now
+        })
+        if (memberErr) {
+          console.warn('createTeam team_members insert error:', memberErr.message)
+        }
+      }
     }
-  } catch {
-    // Tabela teams ainda não criada em public
+  } catch (e: any) {
+    console.warn('createTeam try/catch:', e?.message)
   }
 
-  // 2. Fallback resiliente no perfil do criador
+  // 2. Fallback resiliente: armazena tag no perfil do criador
+  // Usado tanto como backup quanto como única estratégia se a tabela não existe
   if (createdByUserId) {
     try {
-      const { data: prof } = await sb.from('profiles').select('bio_goals').eq('user_id', createdByUserId).maybeSingle()
-      const existingBio = prof?.bio_goals ? prof.bio_goals.replace(/\[TEAM:\{.*?\}\]/g, '').trim() : ''
+      // Garantir que o perfil exista (upsert)
+      const { data: prof } = await sb.from('profiles').select('bio_goals, full_name').eq('user_id', createdByUserId).maybeSingle()
       const teamTag = `[TEAM:${JSON.stringify({ id, name: name.trim(), code, description: description.trim(), created_by: createdByUserId, created_at: now, role: 'capitao' })}]`
-      const updatedBio = existingBio ? `${teamTag} ${existingBio}` : teamTag
-      await sb.from('profiles').update({ bio_goals: updatedBio }).eq('user_id', createdByUserId)
-    } catch (e) {
-      console.warn('createTeam profile tag error:', e)
+
+      if (!prof) {
+        // Perfil não existe ainda — criar com a tag
+        const { data: userData } = await sb.from('users').select('name').eq('id', createdByUserId).maybeSingle()
+        await sb.from('profiles').insert({
+          user_id: createdByUserId,
+          full_name: userData?.name || '',
+          preferred_position: 'Ponteiro',
+          serve_types: '[]',
+          bio_goals: teamTag,
+          show_weight: true,
+          show_height: true,
+          show_reach: true,
+          show_wingspan: true,
+          show_goals: true,
+          show_evaluations: true,
+          show_in_rankings: true,
+          created_at: now,
+          updated_at: now,
+        })
+      } else {
+        const existingBio = extractTeamMetaFromBio(prof.bio_goals)?.cleanBio ?? (prof.bio_goals || '')
+        const updatedBio = existingBio ? `${teamTag} ${existingBio}` : teamTag
+        await sb.from('profiles').update({ bio_goals: updatedBio }).eq('user_id', createdByUserId)
+      }
+    } catch (e: any) {
+      console.error('createTeam profile fallback error:', e?.message)
+      // Se tudo falhar, lançamos exceção para o usuário saber
+      if (!insertedInTable) {
+        throw new Error('Não foi possível salvar os dados do time. Por favor, complete seu perfil antes de criar um time.')
+      }
     }
   }
 
@@ -555,29 +609,54 @@ export async function addUserToTeam(userId: string, teamId: string, role = 'atle
 
   // 1. Tenta adicionar na tabela 'team_members'
   try {
-    await sb.from('team_members').upsert({
+    const { error } = await sb.from('team_members').upsert({
       id: 'tm_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36),
       team_id: teamId,
       user_id: userId,
       role,
       joined_at: now
     }, { onConflict: 'team_id, user_id' })
-  } catch {
-    // fallback
+    if (error) {
+      console.warn('addUserToTeam team_members error:', error.message)
+    }
+  } catch (e: any) {
+    console.warn('addUserToTeam team_members exception:', e?.message)
   }
 
-  // 2. Fallback: atualiza tag no perfil
+  // 2. Fallback: atualiza/cria tag no perfil
   try {
     const team = await getTeamById(teamId)
     if (team) {
       const { data: prof } = await sb.from('profiles').select('bio_goals').eq('user_id', userId).maybeSingle()
-      const existingBio = prof?.bio_goals ? prof.bio_goals.replace(/\[TEAM:\{.*?\}\]/g, '').trim() : ''
       const teamTag = `[TEAM:${JSON.stringify({ id: team.id, name: team.name, code: team.code, description: team.description || '', role })}]`
-      const updatedBio = existingBio ? `${teamTag} ${existingBio}` : teamTag
-      await sb.from('profiles').update({ bio_goals: updatedBio }).eq('user_id', userId)
+
+      if (!prof) {
+        // Criar perfil básico com a tag do time
+        const { data: userData } = await sb.from('users').select('name').eq('id', userId).maybeSingle()
+        await sb.from('profiles').insert({
+          user_id: userId,
+          full_name: userData?.name || '',
+          preferred_position: 'Ponteiro',
+          serve_types: '[]',
+          bio_goals: teamTag,
+          show_weight: true,
+          show_height: true,
+          show_reach: true,
+          show_wingspan: true,
+          show_goals: true,
+          show_evaluations: true,
+          show_in_rankings: true,
+          created_at: now,
+          updated_at: now,
+        })
+      } else {
+        const existingBio = extractTeamMetaFromBio(prof.bio_goals)?.cleanBio ?? (prof.bio_goals || '')
+        const updatedBio = existingBio ? `${teamTag} ${existingBio}` : teamTag
+        await sb.from('profiles').update({ bio_goals: updatedBio }).eq('user_id', userId)
+      }
     }
-  } catch (e) {
-    console.warn('addUserToTeam error:', e)
+  } catch (e: any) {
+    console.warn('addUserToTeam profile fallback error:', e?.message)
   }
 }
 
@@ -737,25 +816,33 @@ export async function getRanking(field: RankingCategory, limit = 100): Promise<R
   if (!isSupabase()) return []
   const sb = getSupabase()!
 
+  // 1. Buscar perfis elegíveis com show_in_rankings !== false
+  const { data: profiles, error: pErr } = await sb.from('profiles').select('user_id, show_in_rankings, show_height, show_reach, show_wingspan, show_weight')
+  if (pErr || !profiles) return []
+
+  const eligibleUserIds = new Set<string>()
+  for (const p of profiles) {
+    if (p.show_in_rankings === false) continue
+    // Checar privacidade específica da métrica
+    if (field === 'height' && p.show_height === false) continue
+    if (field === 'wingspan' && p.show_wingspan === false) continue
+    if ((field === 'reach_jumping' || field === 'vertical_jump' || field === 'attack_reach' || field === 'block_reach') && p.show_reach === false) continue
+    eligibleUserIds.add(p.user_id)
+  }
+
+  if (eligibleUserIds.size === 0) return []
+
+  // 2. Buscar avaliações dos usuários elegíveis
   const { data, error } = await sb.from('evaluations')
     .select('*, users(name, avatar_url)')
-    .not(field, 'is', null)
-    .in('user_id', (() => {
-      // subquery via separate call: profiles with show_in_rankings
-      return []
-    })()) as any
+    .in('user_id', Array.from(eligibleUserIds))
   if (error || !data) return []
 
-  // Buscar perfis com show_in_rankings
-  const { data: rankingProfiles } = await sb.from('profiles').select('user_id').eq('show_in_rankings', true)
-  const rankingUserIds = new Set((rankingProfiles ?? []).map(p => p.user_id))
-
-  // Para cada user, pegar a avaliação mais recente com o campo preenchido
+  // 3. Pegar a avaliação mais recente de cada atleta com valor válido (> 0)
   const byUser = new Map<string, any>()
   for (const r of data) {
-    if (!rankingUserIds.has(r.user_id)) continue
-    const val = field === 'vertical_jump' ? r.vertical_jump : r[field]
-    if (!val || val <= 0) continue
+    const val = r[field]
+    if (val === null || val === undefined || Number(val) <= 0) continue
     if (!byUser.has(r.user_id) || r.evaluation_date > byUser.get(r.user_id).evaluation_date) {
       byUser.set(r.user_id, r)
     }
@@ -764,16 +851,23 @@ export async function getRanking(field: RankingCategory, limit = 100): Promise<R
   const ordered = Array.from(byUser.values())
     .map(r => ({
       athlete_id: r.user_id,
-      name: r.full_name,
+      name: r.full_name || (r.users as any)?.name || 'Atleta',
       avatar_url: (r.users as any)?.avatar_url ?? null,
       position: r.position,
-      value: field === 'vertical_jump' ? r.vertical_jump : r[field],
+      value: Number(r[field]),
       evaluation_date: r.evaluation_date,
     }))
     .sort((a, b) => b.value - a.value)
     .slice(0, limit)
 
-  return ordered.map((r, i) => ({ ...r, rank: i + 1 }))
+  // 4. Calcular posições permitindo empates
+  let currentRank = 1
+  return ordered.map((r, i) => {
+    if (i > 0 && r.value < ordered[i - 1].value) {
+      currentRank = i + 1
+    }
+    return { ...r, rank: currentRank }
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -871,6 +965,25 @@ export async function deleteGoal(goalId: string, userId: string): Promise<boolea
   const sb = getSupabase()!
   const { error } = await sb.from('goals').delete().eq('id', goalId).eq('user_id', userId)
   return !error
+}
+
+export async function deleteUserAccount(userId: string): Promise<boolean> {
+  if (!isSupabase()) return false
+  const sb = getSupabase()!
+  try {
+    await sb.from('evaluations').delete().eq('user_id', userId)
+    await sb.from('goals').delete().eq('user_id', userId)
+    await sb.from('achievements').delete().eq('user_id', userId)
+    try {
+      await sb.from('team_members').delete().eq('user_id', userId)
+    } catch {}
+    await sb.from('profiles').delete().eq('user_id', userId)
+    const { error } = await sb.from('users').delete().eq('id', userId)
+    return !error
+  } catch (err) {
+    console.error('Error deleting user account in Supabase:', err)
+    return false
+  }
 }
 
 export async function syncGoalsWithLatestEvaluation(userId: string): Promise<void> {

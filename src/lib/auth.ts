@@ -4,7 +4,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getUserById, getUserByEmail } from './db';
 import { User } from './types';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'vw_perf_v3_secret_Rf8q2hC4Lz9tY6sX1bN5kA7dW3jF0mV2uQ9rT5yE8i';
+const JWT_SECRET = process.env.JWT_SECRET;
+
+function getJwtSecret(): string {
+  if (!JWT_SECRET) {
+    throw new Error('[auth] JWT_SECRET não configurado. Defina a variável de ambiente JWT_SECRET.');
+  }
+  return JWT_SECRET;
+}
+
 const COOKIE_NAME = 'volley_performance_token';
 
 export async function hashPassword(password: string): Promise<string> {
@@ -19,14 +27,14 @@ export async function comparePassword(password: string, hash: string): Promise<b
 export function signToken(user: { id: string; email: string; name: string }): string {
   return jwt.sign(
     { id: user.id, email: user.email, name: user.name },
-    JWT_SECRET,
+    getJwtSecret(),
     { expiresIn: '30d' }
   );
 }
 
 export function verifyToken(token: string): { id: string; email: string; name: string } | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as { id: string; email: string; name: string };
+    return jwt.verify(token, getJwtSecret()) as { id: string; email: string; name: string };
   } catch {
     return null;
   }

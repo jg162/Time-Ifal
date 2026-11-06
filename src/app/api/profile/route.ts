@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCurrentUserFromRequest } from '@/lib/auth';
-import { getProfileByUserId, updateProfile } from '@/lib/db';
+import { getCurrentUserFromRequest, clearAuthCookie } from '@/lib/auth';
+import { getProfileByUserId, updateProfile, deleteUserAccount } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,5 +37,29 @@ export async function PUT(request: NextRequest) {
   } catch (err: any) {
     console.error('Update profile error:', err);
     return NextResponse.json({ error: 'Erro ao atualizar perfil.' }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const user = await getCurrentUserFromRequest(request);
+    if (!user) {
+      return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
+    }
+
+    const ok = await deleteUserAccount(user.id);
+    if (!ok) {
+      return NextResponse.json({ error: 'Falha ao excluir a conta.' }, { status: 500 });
+    }
+
+    const res = NextResponse.json({
+      success: true,
+      message: 'Sua conta e todos os seus dados foram excluídos com sucesso em conformidade com a LGPD.'
+    });
+    clearAuthCookie(res);
+    return res;
+  } catch (err: any) {
+    console.error('Delete account error:', err);
+    return NextResponse.json({ error: 'Erro ao excluir conta.' }, { status: 500 });
   }
 }

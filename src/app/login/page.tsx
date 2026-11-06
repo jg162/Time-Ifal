@@ -160,7 +160,6 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Quick Demo Info Box */}
           <div className="mt-6 pt-5 border-t border-emerald-950/60 text-center">
             <p className="text-xs text-gray-400">
               Não tem conta ainda?{' '}
@@ -168,10 +167,6 @@ export default function LoginPage() {
                 Cadastre-se aqui
               </Link>
             </p>
-            <div className="mt-3 p-2.5 rounded-lg bg-emerald-950/30 border border-emerald-900/40 text-[11px] text-gray-400 text-left">
-              <span className="font-bold text-emerald-400 block mb-0.5">Dica de Acesso Rápido:</span>
-              Você pode se cadastrar agora mesmo com qualquer e-mail, ou testar com um atleta já existente da equipe (ex: <code className="text-white">matheus.santos@ifal.edu.br</code> / senha: <code className="text-white">ifal1234</code>).
-            </div>
           </div>
         </div>
       </div>

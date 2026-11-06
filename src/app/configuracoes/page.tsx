@@ -18,7 +18,9 @@ import {
   Database,
   Link2,
   Copy,
-  KeyRound
+  KeyRound,
+  Trash2,
+  AlertTriangle,
 } from 'lucide-react';
 
 export default function ConfiguracoesPage() {
@@ -230,6 +232,38 @@ export default function ConfiguracoesPage() {
     a.download = `volley-performance-time-ifal-avaliacoes-${user?.name?.toLowerCase().replace(/\s+/g, '-') || 'atleta'}.json`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmationText !== 'EXCLUIR') {
+      setDeleteError('Digite EXCLUIR para confirmar a exclusão definitiva.');
+      return;
+    }
+
+    setDeletingAccount(true);
+    setDeleteError(null);
+
+    try {
+      const res = await fetch('/api/profile', {
+        method: 'DELETE',
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Erro ao excluir a conta.');
+      }
+
+      router.push('/');
+      router.refresh();
+    } catch (err: any) {
+      setDeleteError(err.message || 'Erro ao processar exclusão.');
+      setDeletingAccount(false);
+    }
   };
 
   if (loading) {
@@ -620,6 +654,99 @@ export default function ConfiguracoesPage() {
                 <span>Exportar Dados (.JSON)</span>
               </button>
             </div>
+          </div>
+
+          {/* PRIVACIDADE E DIREITO DO ATLETA (LGPD) - EXCLUSÃO DE CONTA */}
+          <div className="athletic-card rounded-2xl p-6 sm:p-8 border border-red-950/60 bg-red-950/10">
+            <div className="flex items-center gap-3 mb-4 pb-4 border-b border-red-950/60">
+              <div className="p-2.5 rounded-xl bg-red-500/10 text-red-400 border border-red-500/30">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base sm:text-lg font-bold text-white tracking-wide uppercase">
+                  Exclusão Definitiva de Conta (LGPD)
+                </h3>
+                <p className="text-xs text-gray-400">
+                  Em conformidade com a Lei Geral de Proteção de Dados, você tem o direito de apagar permanentemente todos os seus dados da plataforma.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-red-300">Apagar Perfil e Histórico de Medidas</p>
+                <p className="text-xs text-gray-400 max-w-xl">
+                  Esta ação é irreversível. Todas as suas avaliações físicas, metas, participações em times e dados de login serão excluídos definitivamente dos servidores.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(true)}
+                className="px-5 py-2.5 rounded-xl bg-red-950/60 hover:bg-red-900/80 text-red-300 border border-red-600/50 text-xs font-bold transition-all flex items-center gap-2"
+              >
+                <Trash2 className="w-4 h-4 text-red-400" />
+                <span>Excluir Minha Conta</span>
+              </button>
+            </div>
+
+            {/* Modal de confirmação da exclusão */}
+            {showDeleteConfirm && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+                <div className="w-full max-w-md bg-[#0d0909] border border-red-600/40 rounded-3xl p-6 sm:p-7 shadow-2xl">
+                  <div className="flex items-center gap-3 mb-4 text-red-400">
+                    <AlertTriangle className="w-6 h-6 flex-shrink-0" />
+                    <h4 className="text-lg font-bold text-white uppercase tracking-wide">Confirmar Exclusão</h4>
+                  </div>
+
+                  <p className="text-xs text-gray-300 mb-4 leading-relaxed">
+                    Você tem certeza absoluta? Isso apagará todas as suas avaliações, metas e conquistas sem possibilidade de recuperação.
+                  </p>
+
+                  <p className="text-xs font-semibold text-gray-400 mb-2">
+                    Para confirmar, digite <span className="text-red-400 font-bold uppercase font-mono">EXCLUIR</span> abaixo:
+                  </p>
+
+                  <input
+                    type="text"
+                    value={deleteConfirmationText}
+                    onChange={(e) => setDeleteConfirmationText(e.target.value)}
+                    placeholder="EXCLUIR"
+                    className="w-full bg-[#120a0a] border border-red-900 focus:border-red-500 rounded-xl px-4 py-3 text-sm text-white font-mono uppercase focus:outline-none mb-4 tracking-widest"
+                  />
+
+                  {deleteError && (
+                    <div className="mb-4 p-3 rounded-xl bg-red-950/80 border border-red-600 text-red-300 text-xs">
+                      {deleteError}
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-end gap-3">
+                    <button
+                      type="button"
+                      disabled={deletingAccount}
+                      onClick={() => {
+                        setShowDeleteConfirm(false);
+                        setDeleteConfirmationText('');
+                        setDeleteError(null);
+                      }}
+                      className="px-4 py-2.5 rounded-xl text-xs font-semibold text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      disabled={deletingAccount || deleteConfirmationText !== 'EXCLUIR'}
+                      onClick={handleDeleteAccount}
+                      className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-2"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span>{deletingAccount ? 'Excluindo...' : 'Confirmar Exclusão'}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </main>
       </div>

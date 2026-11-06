@@ -235,6 +235,12 @@ export async function deleteGoal(goalId: string, userId: string): Promise<boolea
   return sql.deleteGoal(goalId, userId)
 }
 
+export async function deleteUserAccount(userId: string): Promise<boolean> {
+  if (useSupabase()) return supabase.deleteUserAccount(userId)
+  const sql = await getSqlite()
+  return sql.deleteUserAccount(userId)
+}
+
 export async function syncGoalsWithLatestEvaluation(userId: string): Promise<void> {
   if (useSupabase()) return supabase.syncGoalsWithLatestEvaluation(userId)
   const sql = await getSqlite()

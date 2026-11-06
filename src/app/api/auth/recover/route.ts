@@ -25,12 +25,19 @@ export async function POST(request: NextRequest) {
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     await createPasswordResetToken(user.email, code);
 
-    // Return the code in the response for seamless testing/demonstration
+    // Em ambiente de desenvolvimento local, logamos o código no servidor para testes
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[AUTH RECOVERY CODE] E-mail: ${user.email} -> Código: ${code}`);
+    }
+
+    // Segurança: Em produção, NUNCA expor o código na resposta HTTP pública
+    // para evitar sequestro de contas por terceiros.
+    const isDevPreview = process.env.ENABLE_DEV_RECOVERY_CODE === 'true';
+
     return NextResponse.json({
       success: true,
-      message: 'Código de recuperação gerado com sucesso!',
-      recoveryCode: code, // Highlighted for user convenience in testing
-      instructions: `Utilize o código ${code} para redefinir sua senha.`
+      message: 'Se este e-mail estiver cadastrado, as instruções e código de verificação foram gerados com segurança.',
+      ...(isDevPreview ? { recoveryCode: code, instructions: `[MODO DEV] Código: ${code}` } : {})
     });
   } catch (err: any) {
     console.error('Password recover error:', err);

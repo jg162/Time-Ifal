@@ -952,6 +952,22 @@ export function deleteGoal(goalId: string, userId: string): boolean {
   return result.changes > 0;
 }
 
+export function deleteUserAccount(userId: string): boolean {
+  const db = getDatabase();
+  const tx = db.transaction(() => {
+    db.prepare('DELETE FROM evaluations WHERE user_id = ?').run(userId);
+    db.prepare('DELETE FROM goals WHERE user_id = ?').run(userId);
+    db.prepare('DELETE FROM achievements WHERE user_id = ?').run(userId);
+    try {
+      db.prepare('DELETE FROM team_members WHERE user_id = ?').run(userId);
+    } catch {}
+    db.prepare('DELETE FROM profiles WHERE user_id = ?').run(userId);
+    db.prepare('DELETE FROM users WHERE id = ?').run(userId);
+  });
+  tx();
+  return true;
+}
+
 /**
  * Atualiza os valores atuais de todas as metas mensuráveis de um atleta
  * com base na sua avaliação mais recente. Chamado a cada nova avaliação.
