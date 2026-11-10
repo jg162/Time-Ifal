@@ -165,9 +165,7 @@ export default function AthleteProfilePage() {
                 {athlete.height !== null && athlete.height !== undefined ? (
                   `${athlete.height} cm`
                 ) : (
-                  <span className="text-gray-500 text-xs flex items-center gap-1 font-sans">
-                    <Lock className="w-3.5 h-3.5" /> Privado
-                  </span>
+                  <span className="text-gray-500 text-xs font-mono">--</span>
                 )}
               </p>
             </div>
@@ -179,9 +177,7 @@ export default function AthleteProfilePage() {
                 {athlete.weight !== null && athlete.weight !== undefined ? (
                   `${athlete.weight} kg`
                 ) : (
-                  <span className="text-gray-500 text-xs flex items-center gap-1 font-sans">
-                    <Lock className="w-3.5 h-3.5" /> Privado
-                  </span>
+                  <span className="text-gray-500 text-xs font-mono">--</span>
                 )}
               </p>
             </div>
@@ -193,9 +189,7 @@ export default function AthleteProfilePage() {
                 {athlete.reach_standing !== null && athlete.reach_standing !== undefined ? (
                   `${athlete.reach_standing} cm`
                 ) : (
-                  <span className="text-gray-500 text-xs flex items-center gap-1 font-sans">
-                    <Lock className="w-3.5 h-3.5" /> Privado
-                  </span>
+                  <span className="text-gray-500 text-xs font-mono">--</span>
                 )}
               </p>
             </div>
@@ -209,9 +203,7 @@ export default function AthleteProfilePage() {
                 {athlete.reach_jumping !== null && athlete.reach_jumping !== undefined ? (
                   `${athlete.reach_jumping} cm`
                 ) : (
-                  <span className="text-gray-500 text-xs flex items-center gap-1 font-sans">
-                    <Lock className="w-3.5 h-3.5" /> Privado
-                  </span>
+                  <span className="text-gray-500 text-xs font-mono">--</span>
                 )}
               </p>
             </div>
@@ -223,9 +215,7 @@ export default function AthleteProfilePage() {
                 {athlete.vertical_jump !== null && athlete.vertical_jump !== undefined ? (
                   `+${athlete.vertical_jump} cm`
                 ) : (
-                  <span className="text-gray-500 text-xs flex items-center gap-1 font-sans">
-                    <Lock className="w-3.5 h-3.5" /> Privado
-                  </span>
+                  <span className="text-gray-500 text-xs font-mono">--</span>
                 )}
               </p>
             </div>
@@ -237,9 +227,7 @@ export default function AthleteProfilePage() {
                 {athlete.wingspan !== null && athlete.wingspan !== undefined ? (
                   `${athlete.wingspan} cm`
                 ) : (
-                  <span className="text-gray-500 text-xs flex items-center gap-1 font-sans">
-                    <Lock className="w-3.5 h-3.5" /> Privado
-                  </span>
+                  <span className="text-gray-500 text-xs font-mono">--</span>
                 )}
               </p>
             </div>
@@ -295,7 +283,7 @@ export default function AthleteProfilePage() {
               <EvolutionCharts evaluations={evaluations} />
             ) : (
               <div className="athletic-card p-8 rounded-2xl text-center text-xs text-gray-400">
-                O atleta optou por manter o histórico completo privado ou ainda possui apenas 1 avaliação registrada.
+                O atleta ainda não possui histórico de avaliações físicas registradas.
               </div>
             )}
           </div>

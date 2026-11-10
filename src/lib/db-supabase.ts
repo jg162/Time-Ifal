@@ -13,6 +13,7 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import bcrypt from 'bcryptjs'
+import { calculateAge, calculateBMI } from './calculations'
 import {
   Achievement,
   AchievementKey,
@@ -861,37 +862,43 @@ export async function getAllTeamAthletes(requestingUserId?: string, teamIdFilter
       serveTypes = latestEval ? (Array.isArray(latestEval.serve_types) ? latestEval.serve_types : JSON.parse(latestEval.serve_types || '[]')) : (p?.serve_types ? (Array.isArray(p.serve_types) ? p.serve_types : JSON.parse(p.serve_types || '[]')) : [])
     } catch { serveTypes = [] }
 
+    const birthDate = p?.birth_date ?? latestEval?.birth_date ?? null
+    const computedAge = latestEval?.age ?? (birthDate ? calculateAge(birthDate) : null)
+    const height = latestEval?.height ?? p?.height ?? null
+    const weight = latestEval?.weight ?? p?.weight ?? null
+    const wingspan = latestEval?.wingspan ?? p?.wingspan ?? null
+
     result.push({
       id: u.id,
       name: p?.full_name || u.name,
       avatar_url: u.avatar_url ?? null,
       position: (latestEval?.position || p?.preferred_position || 'Ponteiro') as Position,
       laterality: latestEval?.laterality || p?.laterality || null,
-      birth_date: p?.birth_date ?? latestEval?.birth_date ?? null,
-      age: latestEval?.age ?? null,
-      height: showHeight ? (latestEval?.height ?? null) : null,
-      weight: showWeight ? (latestEval?.weight ?? null) : null,
-      reach_standing: showReach ? (latestEval?.reach_standing ?? null) : null,
-      reach_jumping: showReach ? (latestEval?.reach_jumping ?? null) : null,
-      wingspan: showWingspan ? (latestEval?.wingspan ?? null) : null,
-      vertical_jump: showReach ? (latestEval?.vertical_jump ?? null) : null,
-      attack_reach: showReach ? (latestEval?.attack_reach ?? null) : null,
-      block_reach: showReach ? (latestEval?.block_reach ?? null) : null,
-      bmi: (showWeight && showHeight) ? (latestEval?.bmi ?? null) : null,
+      birth_date: birthDate,
+      age: computedAge,
+      height,
+      weight,
+      reach_standing: latestEval?.reach_standing ?? null,
+      reach_jumping: latestEval?.reach_jumping ?? null,
+      wingspan,
+      vertical_jump: latestEval?.vertical_jump ?? null,
+      attack_reach: latestEval?.attack_reach ?? null,
+      block_reach: latestEval?.block_reach ?? null,
+      bmi: latestEval?.bmi ?? (weight && height ? calculateBMI(weight, height) : null),
       serve_types: serveTypes,
       practice_time: p?.practice_time || latestEval?.practice_time || null,
-      goals: showGoals ? (latestEval?.goals || displayGoals || null) : null,
+      goals: latestEval?.goals || displayGoals || null,
       last_updated: latestEval?.evaluation_date || p?.updated_at || null,
-      evaluations_count: showEvaluations ? evalCount : 0,
+      evaluations_count: evalCount,
       is_self: isSelf,
       team_id: targetTeamId,
       privacy: {
-        show_weight: Boolean(p?.show_weight),
-        show_height: Boolean(p?.show_height),
-        show_reach: Boolean(p?.show_reach),
-        show_wingspan: Boolean(p?.show_wingspan),
-        show_goals: Boolean(p?.show_goals),
-        show_evaluations: Boolean(p?.show_evaluations),
+        show_weight: true,
+        show_height: true,
+        show_reach: true,
+        show_wingspan: true,
+        show_goals: true,
+        show_evaluations: true,
       },
     })
   }
@@ -904,26 +911,7 @@ export async function getAthleteDetails(athleteId: string, requestingUserId?: st
   const athlete = athletes.find(a => a.id === athleteId)
   if (!athlete) return null
 
-  const isSelf = requestingUserId === athleteId
-  const showEvaluations = isSelf || athlete.privacy.show_evaluations
-
-  let evaluations: Evaluation[] = []
-  if (showEvaluations) {
-    const allEvals = await getEvaluationsByUserId(athleteId)
-    evaluations = allEvals.map(ev => ({
-      ...ev,
-      weight: (isSelf || athlete.privacy.show_weight) ? ev.weight : 0,
-      height: (isSelf || athlete.privacy.show_height) ? ev.height : 0,
-      reach_standing: (isSelf || athlete.privacy.show_reach) ? ev.reach_standing : 0,
-      reach_jumping: (isSelf || athlete.privacy.show_reach) ? ev.reach_jumping : 0,
-      vertical_jump: (isSelf || athlete.privacy.show_reach) ? ev.vertical_jump : 0,
-      attack_reach: (isSelf || athlete.privacy.show_reach) ? ev.attack_reach : null,
-      block_reach: (isSelf || athlete.privacy.show_reach) ? ev.block_reach : null,
-      wingspan: (isSelf || athlete.privacy.show_wingspan) ? ev.wingspan : 0,
-      bmi: (isSelf || (athlete.privacy.show_weight && athlete.privacy.show_height)) ? ev.bmi : 0,
-      goals: (isSelf || athlete.privacy.show_goals) ? ev.goals : 'Informação restrita pelo atleta.',
-    }))
-  }
+  const evaluations = await getEvaluationsByUserId(athleteId)
   return { athlete, evaluations }
 }
 

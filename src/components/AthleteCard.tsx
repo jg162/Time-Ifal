@@ -68,9 +68,7 @@ export default function AthleteCard({ athlete, onSelect, isCurrentUser }: Athlet
               {athlete.height !== null && athlete.height !== undefined ? (
                 `${athlete.height} cm`
               ) : (
-                <span className="text-gray-500 text-xs flex items-center gap-1 font-sans">
-                  <Lock className="w-3 h-3 text-gray-500" /> Privado
-                </span>
+                <span className="text-gray-500 text-xs font-mono">--</span>
               )}
             </span>
           </div>
@@ -82,9 +80,7 @@ export default function AthleteCard({ athlete, onSelect, isCurrentUser }: Athlet
               {athlete.weight !== null && athlete.weight !== undefined ? (
                 `${athlete.weight} kg`
               ) : (
-                <span className="text-gray-500 text-xs flex items-center gap-1 font-sans">
-                  <Lock className="w-3 h-3 text-gray-500" /> Privado
-                </span>
+                <span className="text-gray-500 text-xs font-mono">--</span>
               )}
             </span>
           </div>
@@ -96,9 +92,7 @@ export default function AthleteCard({ athlete, onSelect, isCurrentUser }: Athlet
               {athlete.reach_standing !== null && athlete.reach_standing !== undefined ? (
                 `${athlete.reach_standing} cm`
               ) : (
-                <span className="text-gray-500 text-xs flex items-center gap-1 font-sans">
-                  <Lock className="w-3 h-3 text-gray-500" /> Privado
-                </span>
+                <span className="text-gray-500 text-xs font-mono">--</span>
               )}
             </span>
           </div>
@@ -112,9 +106,7 @@ export default function AthleteCard({ athlete, onSelect, isCurrentUser }: Athlet
               {athlete.reach_jumping !== null && athlete.reach_jumping !== undefined ? (
                 `${athlete.reach_jumping} cm`
               ) : (
-                <span className="text-gray-500 text-xs flex items-center gap-1 font-sans">
-                  <Lock className="w-3 h-3 text-gray-500" /> Privado
-                </span>
+                <span className="text-gray-500 text-xs font-mono">--</span>
               )}
             </span>
           </div>
@@ -126,9 +118,7 @@ export default function AthleteCard({ athlete, onSelect, isCurrentUser }: Athlet
               {athlete.wingspan !== null && athlete.wingspan !== undefined ? (
                 `${athlete.wingspan} cm`
               ) : (
-                <span className="text-gray-500 text-xs flex items-center gap-1 font-sans">
-                  <Lock className="w-3 h-3 text-gray-500" /> Privado
-                </span>
+                <span className="text-gray-500 text-xs font-mono">--</span>
               )}
             </span>
           </div>
@@ -140,9 +130,7 @@ export default function AthleteCard({ athlete, onSelect, isCurrentUser }: Athlet
               {athlete.vertical_jump !== null && athlete.vertical_jump !== undefined ? (
                 `+${athlete.vertical_jump} cm`
               ) : (
-                <span className="text-gray-500 text-xs flex items-center gap-1 font-sans">
-                  <Lock className="w-3 h-3 text-gray-500" /> Privado
-                </span>
+                <span className="text-gray-500 text-xs font-mono">--</span>
               )}
             </span>
           </div>

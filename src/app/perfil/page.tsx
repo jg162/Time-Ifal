@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
@@ -23,7 +23,9 @@ import {
   FileText,
   PlusCircle,
   Clock,
-  ArrowRight
+  ArrowRight,
+  Upload,
+  Trash2
 } from 'lucide-react';
 
 const AVATAR_PRESETS = [
@@ -149,6 +151,73 @@ export default function PerfilPage() {
     } else {
       setServeTypes([...serveTypes, serve]);
     }
+  };
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setErrorMessage('Por favor, selecione uma foto válida da galeria (PNG, JPG, JPEG, WEBP).');
+      return;
+    }
+
+    setUploadingImage(true);
+    setErrorMessage(null);
+
+    const reader = new FileReader();
+    reader.onerror = () => {
+      setErrorMessage('Erro ao ler a foto selecionada. Tente novamente.');
+      setUploadingImage(false);
+    };
+
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onerror = () => {
+        setErrorMessage('Não foi possível processar a imagem selecionada.');
+        setUploadingImage(false);
+      };
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          const MAX_SIZE = 600;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_SIZE) {
+              height = Math.round((height * MAX_SIZE) / width);
+              width = MAX_SIZE;
+            }
+          } else {
+            if (height > MAX_SIZE) {
+              width = Math.round((width * MAX_SIZE) / height);
+              height = MAX_SIZE;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+            setAvatarUrl(compressedDataUrl);
+            setSuccessMessage('Foto carregada com sucesso da sua galeria! Clique em "Salvar alterações" abaixo para salvar no seu perfil.');
+          }
+        } catch (err) {
+          console.error('Image compression error:', err);
+          setAvatarUrl(event.target?.result as string);
+        } finally {
+          setUploadingImage(false);
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -374,46 +443,81 @@ export default function PerfilPage() {
               </h3>
 
               <div className="flex flex-col sm:flex-row items-center gap-6">
-                <img
-                  src={avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(fullName || 'atleta')}`}
-                  alt="Avatar"
-                  className="w-24 h-24 rounded-2xl object-cover border-2 border-emerald-400 shadow-neon bg-emerald-950/30"
-                />
+                <div className="relative group">
+                  <img
+                    src={avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(fullName || 'atleta')}`}
+                    alt="Avatar"
+                    className="w-24 h-24 rounded-2xl object-cover border-2 border-emerald-400 shadow-neon bg-emerald-950/30"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl flex flex-col items-center justify-center text-white text-[10px] font-bold cursor-pointer"
+                  >
+                    <Camera className="w-5 h-5 mb-1 text-emerald-400" />
+                    Alterar foto
+                  </button>
+                </div>
 
-                <div className="flex-1 space-y-3 text-center sm:text-left">
-                  <p className="text-xs text-gray-300">
-                    Escolha um dos avatares esportivos ou insira a URL da sua foto:
-                  </p>
+                <div className="flex-1 space-y-4 text-center sm:text-left">
+                  {/* File input invisível para Galeria do celular ou do PC */}
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                  />
 
-                  <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                    {AVATAR_PRESETS.map((preset, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => setAvatarUrl(preset)}
-                        className={`w-10 h-10 rounded-xl overflow-hidden border transition-all ${
-                          avatarUrl === preset ? 'border-emerald-400 scale-110 shadow-neon' : 'border-gray-700 opacity-60 hover:opacity-100'
-                        }`}
-                      >
-                        <img src={preset} alt="preset" className="w-full h-full object-cover" />
-                      </button>
-                    ))}
+                  {/* Botão de upload da galeria */}
+                  <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5">
                     <button
                       type="button"
-                      onClick={() => setAvatarUrl(`https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(fullName || 'novo')}`)}
-                      className="px-2.5 py-1.5 rounded-lg bg-emerald-950/60 border border-emerald-500/40 text-[10px] font-bold text-emerald-400 hover:bg-emerald-900/50"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploadingImage}
+                      className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all shadow-neon disabled:opacity-50 cursor-pointer"
                     >
-                      Avatar Robótico
+                      <Upload className="w-4 h-4" />
+                      {uploadingImage ? 'Carregando foto...' : 'Escolher foto da galeria (Celular ou PC)'}
                     </button>
+
+                    {avatarUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setAvatarUrl('')}
+                        className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-red-950/40 border border-red-500/30 text-red-400 hover:bg-red-900/40 text-xs font-semibold transition-all cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Remover foto
+                      </button>
+                    )}
                   </div>
 
-                  <input
-                    type="url"
-                    placeholder="Ou cole a URL direta de uma imagem personalizada"
-                    value={avatarUrl}
-                    onChange={(e) => setAvatarUrl(e.target.value)}
-                    className="w-full bg-[#080c09] border border-emerald-950/80 focus:border-emerald-500 rounded-xl px-4 py-2 text-xs text-white focus:outline-none"
-                  />
+                  <div>
+                    <p className="text-[11px] text-gray-400 mb-2">
+                      Ou escolha um avatar pré-definido:
+                    </p>
+                    <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                      {AVATAR_PRESETS.map((preset, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setAvatarUrl(preset)}
+                          className={`w-9 h-9 rounded-xl overflow-hidden border transition-all ${
+                            avatarUrl === preset ? 'border-emerald-400 scale-110 shadow-neon' : 'border-gray-700 opacity-60 hover:opacity-100'
+                          }`}
+                        >
+                          <img src={preset} alt="preset" className="w-full h-full object-cover" />
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => setAvatarUrl(`https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(fullName || 'novo')}`)}
+                        className="px-2.5 py-1.5 rounded-lg bg-emerald-950/60 border border-emerald-500/40 text-[10px] font-bold text-emerald-400 hover:bg-emerald-900/50"
+                      >
+                        Avatar Robô
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

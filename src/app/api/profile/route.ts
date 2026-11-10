@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUserFromRequest, clearAuthCookie } from '@/lib/auth';
-import { getProfileByUserId, updateProfile, deleteUserAccount } from '@/lib/db';
+import { getProfileByUserId, updateProfile, deleteUserAccount, getUserById } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,11 +28,13 @@ export async function PUT(request: NextRequest) {
 
     const body = await request.json();
     const updatedProfile = await updateProfile(user.id, body);
+    const refreshedUser = await getUserById(user.id);
 
     return NextResponse.json({
       success: true,
       message: 'Perfil e configurações atualizados com sucesso!',
-      profile: updatedProfile
+      profile: updatedProfile,
+      user: refreshedUser
     });
   } catch (err: any) {
     console.error('Update profile error:', err);

@@ -102,9 +102,7 @@ export default function AthleteModal({ athlete, onClose, currentUserId }: Athlet
               {athlete.height !== null && athlete.height !== undefined ? (
                 `${athlete.height} cm`
               ) : (
-                <span className="text-gray-500 text-xs flex items-center gap-1 font-sans">
-                  <Lock className="w-3 h-3" /> Privado
-                </span>
+                <span className="text-gray-500 text-xs font-mono">--</span>
               )}
             </p>
           </div>
@@ -116,9 +114,7 @@ export default function AthleteModal({ athlete, onClose, currentUserId }: Athlet
               {athlete.weight !== null && athlete.weight !== undefined ? (
                 `${athlete.weight} kg`
               ) : (
-                <span className="text-gray-500 text-xs flex items-center gap-1 font-sans">
-                  <Lock className="w-3 h-3" /> Privado
-                </span>
+                <span className="text-gray-500 text-xs font-mono">--</span>
               )}
             </p>
           </div>
@@ -130,9 +126,7 @@ export default function AthleteModal({ athlete, onClose, currentUserId }: Athlet
               {athlete.reach_standing !== null && athlete.reach_standing !== undefined ? (
                 `${athlete.reach_standing} cm`
               ) : (
-                <span className="text-gray-500 text-xs flex items-center gap-1 font-sans">
-                  <Lock className="w-3 h-3" /> Privado
-                </span>
+                <span className="text-gray-500 text-xs font-mono">--</span>
               )}
             </p>
           </div>
@@ -146,9 +140,7 @@ export default function AthleteModal({ athlete, onClose, currentUserId }: Athlet
               {athlete.reach_jumping !== null && athlete.reach_jumping !== undefined ? (
                 `${athlete.reach_jumping} cm`
               ) : (
-                <span className="text-gray-500 text-xs flex items-center gap-1 font-sans">
-                  <Lock className="w-3 h-3" /> Privado
-                </span>
+                <span className="text-gray-500 text-xs font-mono">--</span>
               )}
             </p>
           </div>
@@ -160,9 +152,7 @@ export default function AthleteModal({ athlete, onClose, currentUserId }: Athlet
               {athlete.vertical_jump !== null && athlete.vertical_jump !== undefined ? (
                 `+${athlete.vertical_jump} cm`
               ) : (
-                <span className="text-gray-500 text-xs flex items-center gap-1 font-sans">
-                  <Lock className="w-3 h-3" /> Privado
-                </span>
+                <span className="text-gray-500 text-xs font-mono">--</span>
               )}
             </p>
           </div>
@@ -174,9 +164,7 @@ export default function AthleteModal({ athlete, onClose, currentUserId }: Athlet
               {athlete.wingspan !== null && athlete.wingspan !== undefined ? (
                 `${athlete.wingspan} cm`
               ) : (
-                <span className="text-gray-500 text-xs flex items-center gap-1 font-sans">
-                  <Lock className="w-3 h-3" /> Privado
-                </span>
+                <span className="text-gray-500 text-xs font-mono">--</span>
               )}
             </p>
           </div>
@@ -215,14 +203,14 @@ export default function AthleteModal({ athlete, onClose, currentUserId }: Athlet
                 "{athlete.goals}"
               </p>
             ) : (
-              <p className="text-xs text-gray-500 italic flex items-center gap-1.5">
-                <Lock className="w-3.5 h-3.5" /> Informação privada ou não cadastrada pelo atleta.
+              <p className="text-xs text-gray-500 italic">
+                Nenhum objetivo cadastrado no momento.
               </p>
             )}
           </div>
         </div>
 
-        {/* Evolução Histórica (se pública) */}
+        {/* Evolução Histórica */}
         <div className="mt-6">
           <h4 className="text-sm font-bold text-white uppercase tracking-wider mb-3 flex items-center gap-2">
             <Activity className="w-4 h-4 text-emerald-400" /> Histórico de Evolução
@@ -233,7 +221,7 @@ export default function AthleteModal({ athlete, onClose, currentUserId }: Athlet
             <EvolutionCharts evaluations={evaluations} />
           ) : (
             <div className="p-6 rounded-xl bg-black/40 border border-emerald-950 text-center text-xs text-gray-400">
-              O atleta optou por manter o histórico completo privado ou ainda possui apenas 1 avaliação.
+              O atleta ainda não possui avaliações físicas registradas.
             </div>
           )}
         </div>

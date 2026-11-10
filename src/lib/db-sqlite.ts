@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import os from 'os';
 import crypto from 'crypto';
+import { calculateAge, calculateBMI } from './calculations';
 import {
   Achievement,
   AchievementKey,
@@ -695,12 +696,9 @@ export function getAllTeamAthletes(requestingUserId?: string, teamIdFilter?: str
       p.practice_time,
       p.serve_types,
       p.bio_goals,
-      p.show_weight,
-      p.show_height,
-      p.show_reach,
-      p.show_wingspan,
-      p.show_goals,
-      p.show_evaluations,
+      p.height,
+      p.weight,
+      p.wingspan,
       p.updated_at,
       tm.role as team_role
     FROM team_members tm
@@ -714,12 +712,6 @@ export function getAllTeamAthletes(requestingUserId?: string, teamIdFilter?: str
 
   return rows.map(row => {
     const isSelf = requestingUserId === row.id;
-    const showWeight = isSelf || Boolean(row.show_weight);
-    const showHeight = isSelf || Boolean(row.show_height);
-    const showReach = isSelf || Boolean(row.show_reach);
-    const showWingspan = isSelf || Boolean(row.show_wingspan);
-    const showGoals = isSelf || Boolean(row.show_goals);
-    const showEvaluations = isSelf || Boolean(row.show_evaluations);
 
     // Get latest evaluation for this athlete
     const latestEval = db.prepare(`
@@ -738,36 +730,42 @@ export function getAllTeamAthletes(requestingUserId?: string, teamIdFilter?: str
       serveTypes = [];
     }
 
+    const birthDate = row.birth_date || latestEval?.birth_date || null;
+    const computedAge = latestEval?.age ?? (birthDate ? calculateAge(birthDate) : null);
+    const height = latestEval?.height ?? row.height ?? null;
+    const weight = latestEval?.weight ?? row.weight ?? null;
+    const wingspan = latestEval?.wingspan ?? row.wingspan ?? null;
+
     return {
       id: row.id,
       name: row.full_name || row.name,
       avatar_url: row.avatar_url,
       position: (latestEval?.position || row.preferred_position || 'Ponteiro') as Position,
       laterality: latestEval?.laterality || row.laterality || null,
-      birth_date: row.birth_date || latestEval?.birth_date || null,
-      age: latestEval?.age ?? null,
-      height: showHeight ? (latestEval?.height ?? null) : null,
-      weight: showWeight ? (latestEval?.weight ?? null) : null,
-      reach_standing: showReach ? (latestEval?.reach_standing ?? null) : null,
-      reach_jumping: showReach ? (latestEval?.reach_jumping ?? null) : null,
-      wingspan: showWingspan ? (latestEval?.wingspan ?? null) : null,
-      vertical_jump: showReach ? (latestEval?.vertical_jump ?? null) : null,
-      attack_reach: showReach ? (latestEval?.attack_reach ?? null) : null,
-      block_reach: showReach ? (latestEval?.block_reach ?? null) : null,
-      bmi: (showWeight && showHeight) ? (latestEval?.bmi ?? null) : null,
+      birth_date: birthDate,
+      age: computedAge,
+      height,
+      weight,
+      reach_standing: latestEval?.reach_standing ?? null,
+      reach_jumping: latestEval?.reach_jumping ?? null,
+      wingspan,
+      vertical_jump: latestEval?.vertical_jump ?? null,
+      attack_reach: latestEval?.attack_reach ?? null,
+      block_reach: latestEval?.block_reach ?? null,
+      bmi: latestEval?.bmi ?? (weight && height ? calculateBMI(weight, height) : null),
       serve_types: serveTypes,
       practice_time: row.practice_time || latestEval?.practice_time || null,
-      goals: showGoals ? (latestEval?.goals || row.bio_goals || null) : null,
+      goals: latestEval?.goals || row.bio_goals || null,
       last_updated: latestEval?.evaluation_date || row.updated_at || null,
-      evaluations_count: showEvaluations ? evalCount : 0,
+      evaluations_count: evalCount,
       is_self: isSelf,
       privacy: {
-        show_weight: Boolean(row.show_weight),
-        show_height: Boolean(row.show_height),
-        show_reach: Boolean(row.show_reach),
-        show_wingspan: Boolean(row.show_wingspan),
-        show_goals: Boolean(row.show_goals),
-        show_evaluations: Boolean(row.show_evaluations)
+        show_weight: true,
+        show_height: true,
+        show_reach: true,
+        show_wingspan: true,
+        show_goals: true,
+        show_evaluations: true
       }
     };
   });
