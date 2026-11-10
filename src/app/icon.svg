@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 612 612">
+  <defs>
+    <!-- esfera amarela: luz do topo-esquerda, sombra na base-direita -->
+    <radialGradient id="ballBase" cx="0.34" cy="0.30" r="0.98">
+      <stop offset="0"    stop-color="#f7cd6d"/>
+      <stop offset="0.38" stop-color="#eab54d"/>
+      <stop offset="0.72" stop-color="#d1932e"/>
+      <stop offset="0.92" stop-color="#9a6a1c"/>
+      <stop offset="1"    stop-color="#7a5213"/>
+    </radialGradient>
+    <!-- vinheta de volume -->
+    <radialGradient id="ballVignette" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0.62" stop-color="#3a2405" stop-opacity="0"/>
+      <stop offset="0.95" stop-color="#3a2405" stop-opacity="0.42"/>
+      <stop offset="1"    stop-color="#2a1a03" stop-opacity="0.55"/>
+    </radialGradient>
+    <filter id="blur18" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="16"/></filter>
+    <filter id="soft" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="26"/></filter>
+  </defs>
+
+  <!-- fundo azul-marinho -->
+  <rect width="612" height="612" fill="#0d1b2e"/>
+
+  <!-- blocos amarelos arredondados -->
+  <g fill="#e3a33c">
+    <rect x="205" y="38"  width="110" height="110" rx="16"/>
+    <rect x="345" y="38"  width="110" height="110" rx="16"/>
+    <rect x="65"  y="178" width="110" height="110" rx="16"/>
+    <rect x="205" y="178" width="110" height="110" rx="16"/>
+    <rect x="65"  y="318" width="110" height="110" rx="16"/>
+    <rect x="205" y="318" width="110" height="110" rx="16"/>
+    <rect x="65"  y="458" width="110" height="110" rx="16"/>
+    <rect x="205" y="458" width="110" height="110" rx="16"/>
+  </g>
+
+  <!-- ponto vermelho (cabeça do "i") -->
+  <circle cx="120" cy="93" r="55" fill="#e13c3c"/>
+
+  <!-- sombra discreta da bola (só o contorno, sem mancha azulada) -->
+  <circle cx="452" cy="432" r="136" fill="#0a1420" opacity="0.55" filter="url(#soft)"/>
+
+  <!-- ============ BOLA DE VÔLEI AMARELA ============ -->
+  <circle cx="446" cy="425" r="135" fill="url(#ballBase)"/>
+
+  <!-- reflexo especular do topo-esquerda -->
+  <ellipse cx="408" cy="350" rx="48" ry="30" fill="#fff7e0" opacity="0.45"
+           filter="url(#blur18)" transform="rotate(-28 408 350)"/>
+
+  <!-- luz quente na base (reflexo do ambiente) -->
+  <ellipse cx="470" cy="532" rx="88" ry="20" fill="#ffe9b0" opacity="0.22" filter="url(#blur18)"/>
+
+  <!-- vinheta de profundidade -->
+  <circle cx="446" cy="425" r="135" fill="url(#ballVignette)"/>
+
+  <!-- listras azul-marinho largas (geometria autêntica Lucide volleyball, rotacionada) -->
+  <g transform="translate(284 263) scale(13.5) rotate(-15 12 12)"
+     fill="none" stroke="#16294f" stroke-width="1.5"
+     stroke-linecap="round" stroke-linejoin="round">
+    <path d="M11 7a16 16 20 0 1 10.98 4.362"/>
+    <path d="M12 12a13 13 0 0 1-8.66 5"/>
+    <path d="M16.83 13.634a16 16 0 0 1-9.267 7.328"/>
+    <path d="M20.66 17A13 13 0 0 0 12 12a13 13 0 0 1 0-10"/>
+    <path d="M8.17 15.366a16 16 0 0 1-1.713-11.69"/>
+  </g>
+
+  <!-- contorno externo -->
+  <circle cx="446" cy="425" r="135" fill="none" stroke="#eaa93f" stroke-width="9"/>
+</svg>
