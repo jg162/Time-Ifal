@@ -79,22 +79,70 @@ function isSupabase(): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// Helpers de metadados resilientes do atleta em bio_goals
+// ---------------------------------------------------------------------------
+
+interface AthleteMeta {
+  height?: number | null;
+  weight?: number | null;
+  wingspan?: number | null;
+  avatar_url?: string | null;
+  laterality?: Laterality | null;
+  practice_time?: string | null;
+}
+
+function extractAthleteMetaFromBio(bio?: string | null): { meta: AthleteMeta; cleanBio: string } | null {
+  if (!bio) return null
+  const tagStart = bio.indexOf('[ATHLETE_META:')
+  if (tagStart === -1) return null
+  const jsonStart = bio.indexOf('{', tagStart)
+  if (jsonStart === -1) return null
+  let depth = 0
+  let jsonEnd = -1
+  for (let i = jsonStart; i < bio.length; i++) {
+    if (bio[i] === '{') depth++
+    else if (bio[i] === '}') {
+      depth--
+      if (depth === 0) { jsonEnd = i; break }
+    }
+  }
+  if (jsonEnd === -1) return null
+  const closeBracket = bio.indexOf(']', jsonEnd)
+  if (closeBracket === -1) return null
+  const jsonStr = bio.substring(jsonStart, jsonEnd + 1)
+  const fullTag = bio.substring(tagStart, closeBracket + 1)
+  try {
+    const meta = JSON.parse(jsonStr) as AthleteMeta
+    const cleanBio = bio.replace(fullTag, '').trim()
+    return { meta, cleanBio }
+  } catch {
+    return null
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Helpers de tipo
 // ---------------------------------------------------------------------------
 
 function toProfile(row: any): Profile {
+  const parsedMeta = extractAthleteMetaFromBio(row.bio_goals)
+  const meta = parsedMeta?.meta
+  const parsedTeam = extractTeamMetaFromBio(parsedMeta?.cleanBio || row.bio_goals)
+  const cleanBio = parsedTeam ? parsedTeam.cleanBio : (parsedMeta?.cleanBio ?? (row.bio_goals ?? null))
+
   return {
     user_id: row.user_id,
     full_name: row.full_name,
     birth_date: row.birth_date ?? null,
     preferred_position: (row.preferred_position || 'Ponteiro') as Position,
-    laterality: row.laterality ?? null,
-    practice_time: row.practice_time ?? '',
+    laterality: row.laterality ?? meta?.laterality ?? null,
+    practice_time: row.practice_time ?? meta?.practice_time ?? '',
     serve_types: Array.isArray(row.serve_types) ? row.serve_types : JSON.parse(row.serve_types || '[]'),
-    bio_goals: row.bio_goals ?? null,
-    height: row.height !== undefined ? row.height : null,
-    weight: row.weight !== undefined ? row.weight : null,
-    wingspan: row.wingspan !== undefined ? row.wingspan : null,
+    bio_goals: cleanBio,
+    height: row.height !== undefined && row.height !== null ? row.height : (meta?.height ?? null),
+    weight: row.weight !== undefined && row.weight !== null ? row.weight : (meta?.weight ?? null),
+    wingspan: row.wingspan !== undefined && row.wingspan !== null ? row.wingspan : (meta?.wingspan ?? null),
+    avatar_url: row.avatar_url ?? meta?.avatar_url ?? null,
     show_weight: Boolean(row.show_weight),
     show_height: Boolean(row.show_height),
     show_reach: Boolean(row.show_reach),
@@ -172,14 +220,24 @@ export async function getUserById(id: string): Promise<User | null> {
   if (!sb) return null
   const { data, error } = await sb.from('users').select('id, email, name, avatar_url, created_at').eq('id', id).maybeSingle()
   if (error || !data) return null
-  return data as User
+  const user = data as User
+  if (!user.avatar_url) {
+    try {
+      const { data: profData } = await sb.from('profiles').select('avatar_url, bio_goals').eq('user_id', id).maybeSingle()
+      if (profData) {
+        const parsedMeta = extractAthleteMetaFromBio(profData.bio_goals)
+        user.avatar_url = profData.avatar_url || parsedMeta?.meta?.avatar_url || null
+      }
+    } catch {}
+  }
+  return user
 }
 
 export async function createUser(user: { id: string; email: string; password_hash: string; name: string; avatar_url?: string }): Promise<User> {
   if (!isSupabase()) throw new Error('createUser via Supabase não disponível localmente')
   const sb = getSupabase()!
   const now = new Date().toISOString()
-  const slug = generateCardSlugSupabase(user.name)
+  const slug = await generateCardSlugSupabase(user.name)
 
   const { error } = await sb.from('users').insert({
     id: user.id,
@@ -245,7 +303,37 @@ export async function getProfileByUserId(userId: string): Promise<Profile | null
   const sb = getSupabase()!
   const { data, error } = await sb.from('profiles').select('*').eq('user_id', userId).maybeSingle()
   if (error || !data) return null
-  return toProfile(data)
+  const prof = toProfile(data)
+
+  // Fallback para última avaliação caso altura/peso/envergadura estejam nulos na tabela de perfis
+  if (prof.height == null || prof.weight == null || prof.wingspan == null) {
+    try {
+      const { data: latestEv } = await sb.from('evaluations')
+        .select('height, weight, wingspan')
+        .eq('user_id', userId)
+        .order('evaluation_date', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (latestEv) {
+        if (prof.height == null && latestEv.height != null) prof.height = latestEv.height
+        if (prof.weight == null && latestEv.weight != null) prof.weight = latestEv.weight
+        if (prof.wingspan == null && latestEv.wingspan != null) prof.wingspan = latestEv.wingspan
+      }
+    } catch {}
+  }
+
+  // Fallback para users table caso avatar_url esteja nulo
+  if (!prof.avatar_url) {
+    try {
+      const { data: uData } = await sb.from('users').select('avatar_url').eq('id', userId).maybeSingle()
+      if (uData?.avatar_url) {
+        prof.avatar_url = uData.avatar_url
+      }
+    } catch {}
+  }
+
+  return prof
 }
 
 export async function updateProfile(userId: string, data: Partial<Profile> & { name?: string; avatar_url?: string }): Promise<Profile> {
@@ -266,12 +354,26 @@ export async function updateProfile(userId: string, data: Partial<Profile> & { n
     current = await getProfileByUserId(userId)
   }
 
-  let mergedBio = data.bio_goals !== undefined ? data.bio_goals : (current?.bio_goals || '')
+  const existingMeta = current?.bio_goals ? extractAthleteMetaFromBio(current.bio_goals)?.meta : null
   const existingTeam = current?.bio_goals ? extractTeamMetaFromBio(current.bio_goals) : null
-  if (existingTeam && (!mergedBio || !mergedBio.includes('[TEAM:'))) {
-    const teamTag = `[TEAM:${JSON.stringify(existingTeam.team)}]`
-    mergedBio = mergedBio ? `${teamTag} ${mergedBio.trim()}` : teamTag
+
+  const newMeta: AthleteMeta = {
+    height: data.height !== undefined ? data.height : (current?.height ?? existingMeta?.height ?? null),
+    weight: data.weight !== undefined ? data.weight : (current?.weight ?? existingMeta?.weight ?? null),
+    wingspan: data.wingspan !== undefined ? data.wingspan : (current?.wingspan ?? existingMeta?.wingspan ?? null),
+    avatar_url: data.avatar_url !== undefined ? (data.avatar_url && data.avatar_url.trim() !== '' ? data.avatar_url.trim() : null) : (current?.avatar_url ?? existingMeta?.avatar_url ?? null),
+    laterality: data.laterality !== undefined ? data.laterality : (current?.laterality ?? existingMeta?.laterality ?? null),
+    practice_time: data.practice_time !== undefined ? data.practice_time : (current?.practice_time ?? existingMeta?.practice_time ?? ''),
   }
+
+  let rawGoals = data.bio_goals !== undefined ? data.bio_goals : (current?.bio_goals || '')
+  const clean1 = extractAthleteMetaFromBio(rawGoals)?.cleanBio ?? rawGoals
+  const clean2 = extractTeamMetaFromBio(clean1)?.cleanBio ?? clean1
+  let finalBio = clean2.trim()
+  if (existingTeam) {
+    finalBio = `[TEAM:${JSON.stringify(existingTeam.team)}] ${finalBio}`.trim()
+  }
+  finalBio = `[ATHLETE_META:${JSON.stringify(newMeta)}] ${finalBio}`.trim()
 
   const updates: any = {
     full_name: data.full_name ?? (data.name ?? current?.full_name ?? 'Atleta'),
@@ -280,7 +382,7 @@ export async function updateProfile(userId: string, data: Partial<Profile> & { n
     laterality: data.laterality !== undefined ? data.laterality : (current?.laterality ?? null),
     practice_time: data.practice_time !== undefined ? data.practice_time : (current?.practice_time ?? ''),
     serve_types: data.serve_types ? data.serve_types : (current?.serve_types ?? ['Flutuante pulando']),
-    bio_goals: mergedBio,
+    bio_goals: finalBio,
     show_weight: data.show_weight !== undefined ? data.show_weight : (current?.show_weight ?? true),
     show_height: data.show_height !== undefined ? data.show_height : (current?.show_height ?? true),
     show_reach: data.show_reach !== undefined ? data.show_reach : (current?.show_reach ?? true),
@@ -293,31 +395,31 @@ export async function updateProfile(userId: string, data: Partial<Profile> & { n
     updated_at: now,
   }
 
-  if (data.height !== undefined) updates.height = data.height
-  else if (current?.height !== undefined) updates.height = current.height
+  if (newMeta.height !== null && newMeta.height !== undefined) updates.height = newMeta.height
+  if (newMeta.weight !== null && newMeta.weight !== undefined) updates.weight = newMeta.weight
+  if (newMeta.wingspan !== null && newMeta.wingspan !== undefined) updates.wingspan = newMeta.wingspan
+  if (newMeta.avatar_url !== undefined) updates.avatar_url = newMeta.avatar_url
 
-  if (data.weight !== undefined) updates.weight = data.weight
-  else if (current?.weight !== undefined) updates.weight = current.weight
-
-  if (data.wingspan !== undefined) updates.wingspan = data.wingspan
-  else if (current?.wingspan !== undefined) updates.wingspan = current.wingspan
-
-  // Update users table safely (never write null to required fields like name)
+  // Atualiza tabela users de forma segura
   const userUpdates: any = {}
   if (data.name !== undefined && data.name !== null && typeof data.name === 'string' && data.name.trim() !== '') {
     userUpdates.name = data.name.trim()
   }
-  if (data.avatar_url !== undefined) {
-    userUpdates.avatar_url = data.avatar_url && String(data.avatar_url).trim() !== '' ? String(data.avatar_url).trim() : null
+  if (newMeta.avatar_url !== undefined) {
+    userUpdates.avatar_url = newMeta.avatar_url
   }
   if (Object.keys(userUpdates).length > 0) {
-    const { error: uErr } = await sb.from('users').update(userUpdates).eq('id', userId)
-    if (uErr) {
-      console.warn('Non-fatal warning updating users table:', uErr.message)
+    try {
+      const { error: uErr } = await sb.from('users').update(userUpdates).eq('id', userId)
+      if (uErr) {
+        console.warn('Non-fatal warning updating users table:', uErr.message)
+      }
+    } catch (e: any) {
+      console.warn('Users table update caught warning:', e?.message)
     }
   }
 
-  // Progressive resilient update: removes unknown columns if DB schema is missing any migration
+  // Atualização resiliente de profiles: remove colunas inexistentes caso migrations não tenham rodado
   let attempts = 0
   while (attempts < 6) {
     const { error: pErr } = await sb.from('profiles').update(updates).eq('user_id', userId)
@@ -329,13 +431,15 @@ export async function updateProfile(userId: string, data: Partial<Profile> & { n
     if (match && match[1]) {
       delete updates[match[1]]
     } else if (attempts === 0) {
+      delete updates.avatar_url
+    } else if (attempts === 1) {
       delete updates.height
       delete updates.weight
       delete updates.wingspan
-    } else if (attempts === 1) {
+    } else if (attempts === 2) {
       delete updates.laterality
       delete updates.practice_time
-    } else if (attempts === 2) {
+    } else if (attempts === 3) {
       delete updates.public_card_slug
       delete updates.public_card_enabled
     } else {
@@ -359,12 +463,12 @@ export async function createEvaluation(evalData: Omit<Evaluation, 'created_at'>)
   const sb = getSupabase()!
   const now = new Date().toISOString()
 
-  const { data, error } = await sb.from('evaluations').insert({
+  const insertData: any = {
     id: evalData.id,
     user_id: evalData.user_id,
-    evaluation_date: evalData.evaluation_date,
+    evaluation_date: evalData.evaluation_date ? String(evalData.evaluation_date).split('T')[0] : now.split('T')[0],
     full_name: evalData.full_name,
-    birth_date: evalData.birth_date,
+    birth_date: evalData.birth_date ? String(evalData.birth_date).split('T')[0] : '',
     age: evalData.age,
     weight: evalData.weight,
     height: evalData.height,
@@ -383,30 +487,54 @@ export async function createEvaluation(evalData: Omit<Evaluation, 'created_at'>)
     goals: evalData.goals,
     notes: evalData.notes || '',
     created_at: now,
-  }).select().single()
+  }
 
-  if (error || !data) throw error ?? new Error('Falha ao criar avaliação')
+  let attempts = 0
+  let resData: any = null
+  while (attempts < 6) {
+    const { data, error } = await sb.from('evaluations').insert(insertData).select().maybeSingle()
+    if (!error) {
+      resData = data || insertData
+      break
+    }
+    console.warn(`createEvaluation insert attempt ${attempts + 1} warning:`, error?.message)
+    const match = error?.message.match(/column "([^"]+)" of relation "evaluations" does not exist/i) ||
+                  error?.message.match(/Could not find the '([^']+)' column of 'evaluations'/i)
+    if (match && match[1]) {
+      delete insertData[match[1]]
+    } else if (attempts === 0) {
+      delete insertData.seated_height
+      delete insertData.attack_reach
+      delete insertData.block_reach
+    } else if (attempts === 1) {
+      delete insertData.laterality
+      delete insertData.practice_time
+    } else {
+      console.error('Fatal createEvaluation error:', error?.message)
+      throw error ?? new Error('Falha ao criar avaliação no Supabase')
+    }
+    attempts++
+  }
 
-  // Sync profile metadata
+  // Sincroniza biometria com o perfil do atleta
   try {
-    await sb.from('profiles').update({
+    await updateProfile(evalData.user_id, {
       full_name: evalData.full_name,
       birth_date: evalData.birth_date,
+      height: evalData.height,
+      weight: evalData.weight,
+      wingspan: evalData.wingspan,
       preferred_position: evalData.position,
       laterality: evalData.laterality,
       practice_time: evalData.practice_time || '',
       serve_types: evalData.serve_types,
       bio_goals: evalData.goals,
-      height: evalData.height,
-      weight: evalData.weight,
-      wingspan: evalData.wingspan,
-      updated_at: now,
-    }).eq('user_id', evalData.user_id)
-  } catch (err) {
-    console.error('Failed to sync profile on evaluation:', err)
+    })
+  } catch (err: any) {
+    console.warn('Failed to sync profile after evaluation:', err?.message)
   }
 
-  return { ...toEvaluation(data), created_at: now }
+  return { ...toEvaluation(resData || insertData), created_at: now }
 }
 
 export async function getEvaluationsByUserId(userId: string): Promise<Evaluation[]> {
