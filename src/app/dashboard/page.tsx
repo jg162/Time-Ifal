@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import Navbar from '@/components/Navbar';
+import BottomNav from '@/components/BottomNav';
 import MetricCard from '@/components/MetricCard';
 import EvolutionCharts from '@/components/EvolutionCharts';
 import { User, Profile, Evaluation, Team } from '@/lib/types';
@@ -119,7 +120,7 @@ export default function DashboardPage() {
           subtitle="TIME IFAL · Painel principal de acompanhamento do atleta"
         />
 
-        <main className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto w-full">
+        <main className="p-3 sm:p-6 lg:p-8 space-y-5 sm:space-y-6 max-w-7xl mx-auto w-full pb-28 lg:pb-8">
           {/* ATHLETE HERO BANNER */}
           <div className="relative overflow-hidden rounded-3xl p-6 sm:p-8 bg-gradient-to-r from-[#0c1611] via-[#0e1c15] to-[#070908] border border-emerald-500/30 shadow-card">
             <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -495,6 +496,9 @@ export default function DashboardPage() {
           </div>
         </main>
       </div>
+
+      {/* Barra de Navegação Inferior para Celular */}
+      <BottomNav />
     </div>
   );
 }

@@ -252,48 +252,98 @@ export async function updateProfile(userId: string, data: Partial<Profile> & { n
   if (!isSupabase()) throw new Error('updateProfile via Supabase não disponível localmente')
   const sb = getSupabase()!
   const now = new Date().toISOString()
-  const current = await getProfileByUserId(userId)
-  if (!current) throw new Error('Profile not found')
+  let current = await getProfileByUserId(userId)
+  if (!current) {
+    const { data: uData } = await sb.from('users').select('name').eq('id', userId).maybeSingle()
+    const defName = data.full_name || data.name || uData?.name || 'Atleta'
+    await sb.from('profiles').insert({
+      user_id: userId,
+      full_name: defName,
+      preferred_position: data.preferred_position || 'Ponteiro',
+      serve_types: ['Flutuante pulando'],
+      updated_at: now,
+    })
+    current = await getProfileByUserId(userId)
+  }
 
-  let mergedBio = data.bio_goals !== undefined ? data.bio_goals : current.bio_goals
-  const existingTeam = current.bio_goals ? extractTeamMetaFromBio(current.bio_goals) : null
+  let mergedBio = data.bio_goals !== undefined ? data.bio_goals : (current?.bio_goals || '')
+  const existingTeam = current?.bio_goals ? extractTeamMetaFromBio(current.bio_goals) : null
   if (existingTeam && (!mergedBio || !mergedBio.includes('[TEAM:'))) {
     const teamTag = `[TEAM:${JSON.stringify(existingTeam.team)}]`
     mergedBio = mergedBio ? `${teamTag} ${mergedBio.trim()}` : teamTag
   }
 
   const updates: any = {
-    full_name: data.full_name ?? (data.name ?? current.full_name),
-    birth_date: data.birth_date !== undefined ? data.birth_date : current.birth_date,
-    preferred_position: data.preferred_position ?? current.preferred_position,
-    laterality: data.laterality !== undefined ? data.laterality : current.laterality,
-    practice_time: data.practice_time !== undefined ? data.practice_time : current.practice_time,
-    serve_types: data.serve_types ? data.serve_types : current.serve_types,
+    full_name: data.full_name ?? (data.name ?? current?.full_name ?? 'Atleta'),
+    birth_date: data.birth_date !== undefined ? (data.birth_date ? String(data.birth_date).split('T')[0] : null) : (current?.birth_date ?? null),
+    preferred_position: data.preferred_position ?? (current?.preferred_position ?? 'Ponteiro'),
+    laterality: data.laterality !== undefined ? data.laterality : (current?.laterality ?? null),
+    practice_time: data.practice_time !== undefined ? data.practice_time : (current?.practice_time ?? ''),
+    serve_types: data.serve_types ? data.serve_types : (current?.serve_types ?? ['Flutuante pulando']),
     bio_goals: mergedBio,
-    height: data.height !== undefined ? data.height : current.height,
-    weight: data.weight !== undefined ? data.weight : current.weight,
-    wingspan: data.wingspan !== undefined ? data.wingspan : current.wingspan,
-    show_weight: data.show_weight !== undefined ? data.show_weight : current.show_weight,
-    show_height: data.show_height !== undefined ? data.show_height : current.show_height,
-    show_reach: data.show_reach !== undefined ? data.show_reach : current.show_reach,
-    show_wingspan: data.show_wingspan !== undefined ? data.show_wingspan : current.show_wingspan,
-    show_goals: data.show_goals !== undefined ? data.show_goals : current.show_goals,
-    show_evaluations: data.show_evaluations !== undefined ? data.show_evaluations : current.show_evaluations,
-    show_in_rankings: data.show_in_rankings !== undefined ? data.show_in_rankings : current.show_in_rankings,
-    public_card_enabled: data.public_card_enabled !== undefined ? data.public_card_enabled : current.public_card_enabled,
-    public_card_slug: data.public_card_slug !== undefined ? data.public_card_slug : (current.public_card_slug || generateCardSlugSupabase(current.full_name)),
+    show_weight: data.show_weight !== undefined ? data.show_weight : (current?.show_weight ?? true),
+    show_height: data.show_height !== undefined ? data.show_height : (current?.show_height ?? true),
+    show_reach: data.show_reach !== undefined ? data.show_reach : (current?.show_reach ?? true),
+    show_wingspan: data.show_wingspan !== undefined ? data.show_wingspan : (current?.show_wingspan ?? true),
+    show_goals: data.show_goals !== undefined ? data.show_goals : (current?.show_goals ?? true),
+    show_evaluations: data.show_evaluations !== undefined ? data.show_evaluations : (current?.show_evaluations ?? true),
+    show_in_rankings: data.show_in_rankings !== undefined ? data.show_in_rankings : (current?.show_in_rankings ?? true),
+    public_card_enabled: data.public_card_enabled !== undefined ? data.public_card_enabled : (current?.public_card_enabled ?? false),
+    public_card_slug: data.public_card_slug !== undefined ? data.public_card_slug : (current?.public_card_slug || generateCardSlugSupabase(current?.full_name || 'atleta')),
     updated_at: now,
   }
 
-  if (data.name !== undefined || data.avatar_url !== undefined) {
-    await sb.from('users').update({
-      name: data.name ?? null,
-      avatar_url: data.avatar_url ?? null,
-    }).eq('id', userId)
+  if (data.height !== undefined) updates.height = data.height
+  else if (current?.height !== undefined) updates.height = current.height
+
+  if (data.weight !== undefined) updates.weight = data.weight
+  else if (current?.weight !== undefined) updates.weight = current.weight
+
+  if (data.wingspan !== undefined) updates.wingspan = data.wingspan
+  else if (current?.wingspan !== undefined) updates.wingspan = current.wingspan
+
+  // Update users table safely (never write null to required fields like name)
+  const userUpdates: any = {}
+  if (data.name !== undefined && data.name !== null && typeof data.name === 'string' && data.name.trim() !== '') {
+    userUpdates.name = data.name.trim()
+  }
+  if (data.avatar_url !== undefined) {
+    userUpdates.avatar_url = data.avatar_url && String(data.avatar_url).trim() !== '' ? String(data.avatar_url).trim() : null
+  }
+  if (Object.keys(userUpdates).length > 0) {
+    const { error: uErr } = await sb.from('users').update(userUpdates).eq('id', userId)
+    if (uErr) {
+      console.warn('Non-fatal warning updating users table:', uErr.message)
+    }
   }
 
-  const { error } = await sb.from('profiles').update(updates).eq('user_id', userId)
-  if (error) throw error
+  // Progressive resilient update: removes unknown columns if DB schema is missing any migration
+  let attempts = 0
+  while (attempts < 6) {
+    const { error: pErr } = await sb.from('profiles').update(updates).eq('user_id', userId)
+    if (!pErr) break
+
+    console.warn(`Supabase profile update attempt ${attempts + 1} warning:`, pErr.message)
+    const match = pErr.message.match(/column "([^"]+)" of relation "profiles" does not exist/i) ||
+                  pErr.message.match(/Could not find the '([^']+)' column of 'profiles'/i)
+    if (match && match[1]) {
+      delete updates[match[1]]
+    } else if (attempts === 0) {
+      delete updates.height
+      delete updates.weight
+      delete updates.wingspan
+    } else if (attempts === 1) {
+      delete updates.laterality
+      delete updates.practice_time
+    } else if (attempts === 2) {
+      delete updates.public_card_slug
+      delete updates.public_card_enabled
+    } else {
+      console.error('Fatal profile update error after fallbacks:', pErr.message)
+      throw new Error(`Falha ao salvar perfil no Supabase: ${pErr.message}`)
+    }
+    attempts++
+  }
 
   const updated = await getProfileByUserId(userId)
   if (!updated) throw new Error('Profile not found after update')

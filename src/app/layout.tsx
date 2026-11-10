@@ -1,9 +1,17 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
   title: 'TIME IFAL | Plataforma de Avaliação e Acompanhamento Esportivo',
   description: 'Plataforma de avaliação física e acompanhamento esportivo de atletas de vôlei do IFAL.',
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: 'cover',
+  themeColor: '#080a09',
 };
 
 export default function RootLayout({

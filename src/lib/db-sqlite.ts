@@ -346,44 +346,71 @@ export function updateProfile(userId: string, data: Partial<Profile> & { name?: 
   const db = getDatabase();
   const now = new Date().toISOString();
 
-  const current = getProfileByUserId(userId);
+  let current = getProfileByUserId(userId);
   if (!current) {
-    throw new Error('Profile not found');
+    const user = getUserById(userId);
+    const defName = data.full_name || data.name || user?.name || 'Atleta';
+    db.prepare(`
+      INSERT INTO profiles (
+        user_id, full_name, birth_date, preferred_position, serve_types, bio_goals, practice_time,
+        show_weight, show_height, show_reach, show_wingspan, show_goals, show_evaluations,
+        show_in_rankings, public_card_enabled, public_card_slug, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1, 1, 1, 1, 1, 1, 0, ?, ?)
+    `).run(
+      userId,
+      defName,
+      null,
+      data.preferred_position || 'Ponteiro',
+      '["Flutuante pulando"]',
+      '',
+      '',
+      generateCardSlug(defName),
+      now
+    );
+    current = getProfileByUserId(userId);
   }
 
   const tx = db.transaction(() => {
     if (data.name !== undefined || data.avatar_url !== undefined) {
-      db.prepare(`
-        UPDATE users
-        SET name = COALESCE(?, name),
-            avatar_url = COALESCE(?, avatar_url)
-        WHERE id = ?
-      `).run(data.name || null, data.avatar_url || null, userId);
+      const userUpdates: string[] = [];
+      const userParams: any[] = [];
+      if (data.name !== undefined && data.name && data.name.trim() !== '') {
+        userUpdates.push('name = ?');
+        userParams.push(data.name.trim());
+      }
+      if (data.avatar_url !== undefined) {
+        userUpdates.push('avatar_url = ?');
+        userParams.push(data.avatar_url && data.avatar_url.trim() !== '' ? data.avatar_url.trim() : null);
+      }
+      if (userUpdates.length > 0) {
+        userParams.push(userId);
+        db.prepare(`UPDATE users SET ${userUpdates.join(', ')} WHERE id = ?`).run(...userParams);
+      }
     }
 
     const updated = {
-      full_name: data.full_name ?? (data.name ?? current.full_name),
-      birth_date: data.birth_date !== undefined ? data.birth_date : current.birth_date,
-      preferred_position: data.preferred_position ?? current.preferred_position,
-      laterality: data.laterality !== undefined ? data.laterality : current.laterality,
-      practice_time: data.practice_time !== undefined ? data.practice_time : current.practice_time,
-      serve_types: data.serve_types ? JSON.stringify(data.serve_types) : JSON.stringify(current.serve_types),
-      bio_goals: data.bio_goals !== undefined ? data.bio_goals : current.bio_goals,
-      height: data.height !== undefined ? data.height : current.height,
-      weight: data.weight !== undefined ? data.weight : current.weight,
-      wingspan: data.wingspan !== undefined ? data.wingspan : current.wingspan,
-      show_weight: data.show_weight !== undefined ? toInt(data.show_weight) : toInt(current.show_weight),
-      show_height: data.show_height !== undefined ? toInt(data.show_height) : toInt(current.show_height),
-      show_reach: data.show_reach !== undefined ? toInt(data.show_reach) : toInt(current.show_reach),
-      show_wingspan: data.show_wingspan !== undefined ? toInt(data.show_wingspan) : toInt(current.show_wingspan),
-      show_goals: data.show_goals !== undefined ? toInt(data.show_goals) : toInt(current.show_goals),
-      show_evaluations: data.show_evaluations !== undefined ? toInt(data.show_evaluations) : toInt(current.show_evaluations),
-      show_in_rankings: data.show_in_rankings !== undefined ? toInt(data.show_in_rankings) : toInt(current.show_in_rankings),
-      public_card_enabled: data.public_card_enabled !== undefined ? toInt(data.public_card_enabled) : toInt(current.public_card_enabled),
+      full_name: data.full_name ?? (data.name ?? current!.full_name),
+      birth_date: data.birth_date !== undefined ? (data.birth_date ? data.birth_date.split('T')[0] : null) : current!.birth_date,
+      preferred_position: data.preferred_position ?? current!.preferred_position,
+      laterality: data.laterality !== undefined ? data.laterality : current!.laterality,
+      practice_time: data.practice_time !== undefined ? data.practice_time : current!.practice_time,
+      serve_types: data.serve_types ? JSON.stringify(data.serve_types) : JSON.stringify(current!.serve_types),
+      bio_goals: data.bio_goals !== undefined ? data.bio_goals : current!.bio_goals,
+      height: data.height !== undefined ? data.height : current!.height,
+      weight: data.weight !== undefined ? data.weight : current!.weight,
+      wingspan: data.wingspan !== undefined ? data.wingspan : current!.wingspan,
+      show_weight: data.show_weight !== undefined ? toInt(data.show_weight) : toInt(current!.show_weight),
+      show_height: data.show_height !== undefined ? toInt(data.show_height) : toInt(current!.show_height),
+      show_reach: data.show_reach !== undefined ? toInt(data.show_reach) : toInt(current!.show_reach),
+      show_wingspan: data.show_wingspan !== undefined ? toInt(data.show_wingspan) : toInt(current!.show_wingspan),
+      show_goals: data.show_goals !== undefined ? toInt(data.show_goals) : toInt(current!.show_goals),
+      show_evaluations: data.show_evaluations !== undefined ? toInt(data.show_evaluations) : toInt(current!.show_evaluations),
+      show_in_rankings: data.show_in_rankings !== undefined ? toInt(data.show_in_rankings) : toInt(current!.show_in_rankings),
+      public_card_enabled: data.public_card_enabled !== undefined ? toInt(data.public_card_enabled) : toInt(current!.public_card_enabled),
       public_card_slug:
         data.public_card_slug !== undefined
           ? data.public_card_slug
-          : (current.public_card_slug || generateCardSlug(current.full_name)),
+          : (current!.public_card_slug || generateCardSlug(current!.full_name)),
     };
 
     db.prepare(`

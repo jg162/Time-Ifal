@@ -19,7 +19,8 @@ import {
   Medal,
   CreditCard,
   FileText,
-  ChevronRight
+  ChevronRight,
+  X
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -91,6 +92,15 @@ export default function Sidebar({ currentUser, isOpen, onClose }: SidebarProps) 
               </p>
             </div>
           </Link>
+
+          {/* Close button on mobile */}
+          <button
+            onClick={onClose}
+            className="p-2 -mr-2 rounded-xl text-gray-400 hover:text-white hover:bg-emerald-950/40 lg:hidden transition-colors"
+            aria-label="Fechar menu"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
         {/* Quick Action Button */}

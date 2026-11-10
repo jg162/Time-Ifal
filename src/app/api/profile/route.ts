@@ -38,7 +38,7 @@ export async function PUT(request: NextRequest) {
     });
   } catch (err: any) {
     console.error('Update profile error:', err);
-    return NextResponse.json({ error: 'Erro ao atualizar perfil.' }, { status: 500 });
+    return NextResponse.json({ error: err?.message || 'Erro ao atualizar perfil.' }, { status: 500 });
   }
 }
 
