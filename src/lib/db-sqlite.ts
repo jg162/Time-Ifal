@@ -189,6 +189,7 @@ function initTables(db: Database.Database) {
   addColumnIfMissing(db, 'profiles', 'height', 'REAL');
   addColumnIfMissing(db, 'profiles', 'weight', 'REAL');
   addColumnIfMissing(db, 'profiles', 'wingspan', 'REAL');
+  addColumnIfMissing(db, 'profiles', 'avatar_url', 'TEXT');
 
   addColumnIfMissing(db, 'evaluations', 'seated_height', 'REAL');
   addColumnIfMissing(db, 'evaluations', 'attack_reach', 'REAL');
@@ -257,7 +258,16 @@ export function getUserByEmail(email: string): (User & { password_hash: string }
 export function getUserById(id: string): User | null {
   const db = getDatabase();
   const stmt = db.prepare('SELECT id, email, name, avatar_url, created_at FROM users WHERE id = ?');
-  return (stmt.get(id) as any) || null;
+  const user = (stmt.get(id) as any) || null;
+  if (user && !user.avatar_url) {
+    try {
+      const pRow = db.prepare('SELECT avatar_url FROM profiles WHERE user_id = ?').get(id) as any;
+      if (pRow?.avatar_url) {
+        user.avatar_url = pRow.avatar_url;
+      }
+    } catch {}
+  }
+  return user;
 }
 
 export function createUser(user: { id: string; email: string; password_hash: string; name: string; avatar_url?: string }): User {
@@ -317,6 +327,27 @@ export function getProfileByUserId(userId: string): Profile | null {
   const row = stmt.get(userId) as any;
   if (!row) return null;
 
+  let uRow: any = null;
+  try {
+    uRow = db.prepare('SELECT avatar_url FROM users WHERE id = ?').get(userId);
+  } catch {}
+  const avatarUrl = row.avatar_url || uRow?.avatar_url || null;
+
+  let height = row.height ?? null;
+  let weight = row.weight ?? null;
+  let wingspan = row.wingspan ?? null;
+
+  if (height == null || weight == null || wingspan == null) {
+    try {
+      const latestEv = db.prepare('SELECT height, weight, wingspan FROM evaluations WHERE user_id = ? ORDER BY evaluation_date DESC, created_at DESC LIMIT 1').get(userId) as any;
+      if (latestEv) {
+        if (height == null && latestEv.height != null) height = latestEv.height;
+        if (weight == null && latestEv.weight != null) weight = latestEv.weight;
+        if (wingspan == null && latestEv.wingspan != null) wingspan = latestEv.wingspan;
+      }
+    } catch {}
+  }
+
   return {
     user_id: row.user_id,
     full_name: row.full_name,
@@ -326,9 +357,10 @@ export function getProfileByUserId(userId: string): Profile | null {
     practice_time: row.practice_time ?? '',
     serve_types: JSON.parse(row.serve_types || '[]'),
     bio_goals: row.bio_goals,
-    height: row.height ?? null,
-    weight: row.weight ?? null,
-    wingspan: row.wingspan ?? null,
+    height,
+    weight,
+    wingspan,
+    avatar_url: avatarUrl,
     show_weight: Boolean(row.show_weight),
     show_height: Boolean(row.show_height),
     show_reach: Boolean(row.show_reach),
@@ -425,6 +457,7 @@ export function updateProfile(userId: string, data: Partial<Profile> & { name?: 
           height = ?,
           weight = ?,
           wingspan = ?,
+          avatar_url = COALESCE(?, avatar_url),
           show_weight = ?,
           show_height = ?,
           show_reach = ?,
@@ -447,6 +480,7 @@ export function updateProfile(userId: string, data: Partial<Profile> & { name?: 
       updated.height ?? null,
       updated.weight ?? null,
       updated.wingspan ?? null,
+      data.avatar_url !== undefined ? (data.avatar_url && data.avatar_url.trim() !== '' ? data.avatar_url.trim() : null) : null,
       updated.show_weight,
       updated.show_height,
       updated.show_reach,

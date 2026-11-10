@@ -4,8 +4,9 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import Navbar from '@/components/Navbar';
+import BottomNav from '@/components/BottomNav';
 import EvaluationForm from '@/components/EvaluationForm';
-import { User, Profile } from '@/lib/types';
+import { User, Profile, Evaluation } from '@/lib/types';
 import { ClipboardList, Sparkles } from 'lucide-react';
 
 export default function AvaliacaoPage() {
@@ -15,6 +16,7 @@ export default function AvaliacaoPage() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [latestEval, setLatestEval] = useState<Evaluation | null>(null);
 
   useEffect(() => {
     async function checkAuth() {
@@ -27,6 +29,7 @@ export default function AvaliacaoPage() {
         const data = await res.json();
         setUser(data.user);
         setProfile(data.profile);
+        setLatestEval(data.latestEvaluation);
       } catch (err) {
         console.error('Error loading athlete auth:', err);
         router.push('/login');
@@ -65,7 +68,7 @@ export default function AvaliacaoPage() {
           subtitle="Registro de características físicas, técnicas e objetivos esportivos"
         />
 
-        <main className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-5xl mx-auto w-full">
+        <main className="p-4 sm:p-6 lg:p-8 pb-24 lg:pb-8 space-y-6 max-w-5xl mx-auto w-full">
           {/* Header Banner */}
           <div className="p-6 rounded-3xl bg-gradient-to-r from-emerald-950/40 via-[#0a120e] to-[#070908] border border-emerald-500/30 flex items-center justify-between">
             <div>
@@ -90,12 +93,14 @@ export default function AvaliacaoPage() {
             initialData={{
               full_name: profile?.full_name || user?.name || '',
               birth_date: profile?.birth_date || '',
-              height: profile?.height,
-              weight: profile?.weight,
-              wingspan: profile?.wingspan,
-              position: profile?.preferred_position || 'Ponteiro',
-              serve_types: profile?.serve_types || ['Flutuante pulando'],
-              goals: profile?.bio_goals || '',
+              height: profile?.height ?? latestEval?.height,
+              weight: profile?.weight ?? latestEval?.weight,
+              wingspan: profile?.wingspan ?? latestEval?.wingspan,
+              position: profile?.preferred_position || latestEval?.position || 'Ponteiro',
+              serve_types: (profile?.serve_types && profile.serve_types.length > 0) ? profile.serve_types : (latestEval?.serve_types || ['Flutuante pulando']),
+              goals: profile?.bio_goals || latestEval?.goals || '',
+              laterality: profile?.laterality ?? latestEval?.laterality,
+              practice_time: profile?.practice_time || latestEval?.practice_time,
             }}
             onSuccess={() => {
               router.push('/avaliacoes');
@@ -103,6 +108,8 @@ export default function AvaliacaoPage() {
             }}
           />
         </main>
+
+        <BottomNav />
       </div>
     </div>
   );

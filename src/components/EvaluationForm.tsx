@@ -35,6 +35,16 @@ interface EvaluationFormProps {
   onSuccess?: () => void;
 }
 
+function parseDecimal(val: string, isDimension = false): number {
+  if (!val) return 0;
+  const clean = String(val).trim().replace(',', '.');
+  const n = parseFloat(clean);
+  if (isNaN(n) || n <= 0) return 0;
+  // Converte metros para centímetros caso digitado ex: 1.85 ou 1,85
+  if (isDimension && n < 3.0) return Math.round(n * 100);
+  return Math.round(n * 10) / 10;
+}
+
 export default function EvaluationForm({ initialData, onSuccess }: EvaluationFormProps) {
   const router = useRouter();
 
@@ -43,7 +53,7 @@ export default function EvaluationForm({ initialData, onSuccess }: EvaluationFor
   // Form states
   const [evaluationDate, setEvaluationDate] = useState<string>(todayStr);
   const [fullName, setFullName] = useState<string>(initialData?.full_name || '');
-  const [birthDate, setBirthDate] = useState<string>(initialData?.birth_date || '');
+  const [birthDate, setBirthDate] = useState<string>(initialData?.birth_date ? initialData.birth_date.split('T')[0] : '');
   const [weight, setWeight] = useState<string>(initialData?.weight != null ? String(initialData.weight) : '');
   const [height, setHeight] = useState<string>(initialData?.height != null ? String(initialData.height) : '');
   const [reachStanding, setReachStanding] = useState<string>('');
@@ -64,16 +74,34 @@ export default function EvaluationForm({ initialData, onSuccess }: EvaluationFor
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+  // Sincroniza initialData caso chegue assincronamente
+  useEffect(() => {
+    if (!initialData) return;
+    if (initialData.full_name && !fullName) setFullName(initialData.full_name);
+    if (initialData.birth_date && !birthDate) setBirthDate(initialData.birth_date.split('T')[0]);
+    if (initialData.weight != null && !weight) setWeight(String(initialData.weight));
+    if (initialData.height != null && !height) setHeight(String(initialData.height));
+    if (initialData.wingspan != null && !wingspan) setWingspan(String(initialData.wingspan));
+    if (initialData.position && position === 'Ponteiro') setPosition(initialData.position);
+    if (initialData.laterality && !laterality) setLaterality(initialData.laterality);
+    if (initialData.practice_time && !practiceTime) setPracticeTime(initialData.practice_time);
+    if (initialData.goals && !goals) setGoals(initialData.goals);
+    if (initialData.serve_types && initialData.serve_types.length > 0 && serveTypes.length === 1 && serveTypes[0] === 'Flutuante pulando') {
+      setServeTypes(initialData.serve_types);
+    }
+  }, [initialData]);
+
   // Auto-calculated reactive metrics
   const calculatedAge = calculateAge(birthDate, evaluationDate);
-  const numStanding = parseFloat(reachStanding) || 0;
-  const numJumping = parseFloat(reachJumping) || 0;
-  const numSeated = parseFloat(seatedHeight) || 0;
-  const numAttack = parseFloat(attackReach) || 0;
-  const numBlock = parseFloat(blockReach) || 0;
+  const numStanding = parseDecimal(reachStanding);
+  const numJumping = parseDecimal(reachJumping);
+  const numSeated = parseDecimal(seatedHeight);
+  const numAttack = parseDecimal(attackReach);
+  const numBlock = parseDecimal(blockReach);
   const calculatedVerticalJump = calculateVerticalJump(numStanding, numJumping);
-  const numWeight = parseFloat(weight) || 0;
-  const numHeight = parseFloat(height) || 0;
+  const numWeight = parseDecimal(weight);
+  const numHeight = parseDecimal(height, true);
+  const numWingspan = parseDecimal(wingspan, true);
   const calculatedBMI = calculateBMI(numWeight, numHeight);
   const bmiCategory = getBMICategory(calculatedBMI);
   const jumpCategory = getJumpCategory(calculatedVerticalJump);
@@ -121,7 +149,7 @@ export default function EvaluationForm({ initialData, onSuccess }: EvaluationFor
       setErrorMessage('O alcance vertical pulando deve ser maior ou igual ao alcance vertical parado.');
       return;
     }
-    if (!wingspan || parseFloat(wingspan) <= 0) {
+    if (!wingspan || numWingspan <= 0) {
       setErrorMessage('Por favor, informe a envergadura em cm.');
       return;
     }
@@ -151,12 +179,12 @@ export default function EvaluationForm({ initialData, onSuccess }: EvaluationFor
         body: JSON.stringify({
           evaluation_date: evaluationDate,
           full_name: fullName.trim(),
-          birth_date: birthDate,
+          birth_date: birthDate ? birthDate.split('T')[0] : '',
           weight: numWeight,
           height: numHeight,
           reach_standing: numStanding,
           reach_jumping: numJumping,
-          wingspan: parseFloat(wingspan),
+          wingspan: numWingspan,
           seated_height: numSeated > 0 ? numSeated : null,
           attack_reach: numAttack > 0 ? numAttack : null,
           block_reach: numBlock > 0 ? numBlock : null,
@@ -321,11 +349,9 @@ export default function EvaluationForm({ initialData, onSuccess }: EvaluationFor
             </label>
             <div className="relative">
               <input
-                type="number"
-                step="0.1"
-                min="30"
-                max="200"
-                placeholder="Ex: 85.5"
+                type="text"
+                inputMode="decimal"
+                placeholder="Ex: 85.5 ou 85,5"
                 value={weight}
                 onChange={(e) => setWeight(e.target.value)}
                 required
@@ -342,11 +368,9 @@ export default function EvaluationForm({ initialData, onSuccess }: EvaluationFor
             </label>
             <div className="relative">
               <input
-                type="number"
-                step="0.5"
-                min="100"
-                max="240"
-                placeholder="Ex: 195"
+                type="text"
+                inputMode="decimal"
+                placeholder="Ex: 195 ou 1,95"
                 value={height}
                 onChange={(e) => setHeight(e.target.value)}
                 required
@@ -363,11 +387,9 @@ export default function EvaluationForm({ initialData, onSuccess }: EvaluationFor
             </label>
             <div className="relative">
               <input
-                type="number"
-                step="0.5"
-                min="100"
-                max="260"
-                placeholder="Ex: 200"
+                type="text"
+                inputMode="decimal"
+                placeholder="Ex: 200 ou 2,00"
                 value={wingspan}
                 onChange={(e) => setWingspan(e.target.value)}
                 required
@@ -384,10 +406,8 @@ export default function EvaluationForm({ initialData, onSuccess }: EvaluationFor
             </label>
             <div className="relative">
               <input
-                type="number"
-                step="0.5"
-                min="150"
-                max="320"
+                type="text"
+                inputMode="decimal"
                 placeholder="Ex: 248"
                 value={reachStanding}
                 onChange={(e) => setReachStanding(e.target.value)}
@@ -406,10 +426,8 @@ export default function EvaluationForm({ initialData, onSuccess }: EvaluationFor
             </label>
             <div className="relative">
               <input
-                type="number"
-                step="0.5"
-                min="180"
-                max="390"
+                type="text"
+                inputMode="decimal"
                 placeholder="Ex: 342"
                 value={reachJumping}
                 onChange={(e) => setReachJumping(e.target.value)}
@@ -428,10 +446,8 @@ export default function EvaluationForm({ initialData, onSuccess }: EvaluationFor
             </label>
             <div className="relative">
               <input
-                type="number"
-                step="0.5"
-                min="60"
-                max="130"
+                type="text"
+                inputMode="decimal"
                 placeholder="Ex: 100"
                 value={seatedHeight}
                 onChange={(e) => setSeatedHeight(e.target.value)}
@@ -451,10 +467,8 @@ export default function EvaluationForm({ initialData, onSuccess }: EvaluationFor
             </label>
             <div className="relative">
               <input
-                type="number"
-                step="0.5"
-                min="100"
-                max="420"
+                type="text"
+                inputMode="decimal"
                 placeholder="Ex: 350"
                 value={attackReach}
                 onChange={(e) => setAttackReach(e.target.value)}
@@ -480,10 +494,8 @@ export default function EvaluationForm({ initialData, onSuccess }: EvaluationFor
             </label>
             <div className="relative">
               <input
-                type="number"
-                step="0.5"
-                min="100"
-                max="420"
+                type="text"
+                inputMode="decimal"
                 placeholder="Ex: 346"
                 value={blockReach}
                 onChange={(e) => setBlockReach(e.target.value)}

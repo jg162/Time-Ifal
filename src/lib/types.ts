@@ -67,6 +67,7 @@ export interface Profile {
   height?: number | null;
   weight?: number | null;
   wingspan?: number | null;
+  avatar_url?: string | null;
   show_weight: boolean;
   show_height: boolean;
   show_reach: boolean;
