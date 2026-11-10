@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
     }
 
     const evaluations = await getEvaluationsByUserId(user.id); // histórico completo, preservado
+
     const periodParam = request.nextUrl.searchParams.get('periodo'); // meses: '' = tudo
 
     const evaluationsForPeriod = filterByPeriod(evaluations, periodParam ? parseInt(periodParam, 10) : null);

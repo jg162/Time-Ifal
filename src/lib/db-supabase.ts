@@ -54,11 +54,35 @@ function getSupabase(): SupabaseClient | null {
   if (!rawUrl || !serviceKey || rawUrl.includes('demo.supabase.co') || rawUrl.includes('seu-projeto.supabase.co')) return null
   const url = rawUrl.replace(/\/+$/, '')
   if (!supabaseInstance) {
+    // IMPORTANTE: o supabase-js envia headers extras (x-client-info,
+    // accept-profile) que fazem o gateway do Supabase servir respostas
+    // vazias EM CACHE (bug observado em produção: SELECT retornava 200 []
+    // enquanto o REST direto retornava os dados). Removemos esses headers
+    // para garantir leituras sempre frescas.
+    const stripFetch: typeof fetch = async (input, init) => {
+      try {
+        const headers =
+          init && init.headers
+            ? init.headers instanceof Headers
+              ? init.headers
+              : new Headers(init.headers as Record<string, string>)
+            : new Headers()
+        const clean: Record<string, string> = {}
+        headers.forEach((value, key) => {
+          const k = key.toLowerCase()
+          if (k !== 'x-client-info' && k !== 'accept-profile') clean[k] = value
+        })
+        return fetch(input as string, { ...init, headers: clean })
+      } catch {
+        return fetch(input as string, init)
+      }
+    }
     supabaseInstance = createClient(url, serviceKey, {
       auth: {
         persistSession: false,
         autoRefreshToken: false,
       },
+      global: { fetch: stripFetch },
     })
   }
   return supabaseInstance
