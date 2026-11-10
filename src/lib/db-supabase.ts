@@ -54,13 +54,28 @@ function getSupabase(): SupabaseClient | null {
   if (!rawUrl || !serviceKey || rawUrl.includes('demo.supabase.co') || rawUrl.includes('seu-projeto.supabase.co')) return null
   const url = rawUrl.replace(/\/+$/, '')
   if (!supabaseInstance) {
-    // IMPORTANTE: o supabase-js envia headers extras (x-client-info,
-    // accept-profile) que fazem o gateway do Supabase servir respostas
-    // vazias EM CACHE (bug observado em produção: SELECT retornava 200 []
-    // enquanto o REST direto retornava os dados). Removemos esses headers
-    // para garantir leituras sempre frescas.
+    // IMPORTANTE (produção): o gateway do Supabase faz cache de respostas GET
+    // chaveadas por URL+headers. Em fluxos onde uma leitura acontece ANTES de
+    // haver dados (ex.: avaliação de conquistas durante o cadastro), a resposta
+    // vazia fica presa no cache e leituras posteriores — mesmo após a gravação
+    // dos dados — continuam devolvendo 200 [] (bug observado na evolução e nos
+    // rankings). Como o PostgREST rejeita parâmetros desconhecidos, o bust é
+    // feito com um filtro sempre-verdadeiro e aleatório (id=not.eq.<rand>):
+    // não altera o resultado e garante uma chave de cache nova por consulta.
+    // Também removemos headers extras do SDK (x-client-info, accept-profile)
+    // para reduzir variações de chave de cache.
     const stripFetch: typeof fetch = async (input, init) => {
       try {
+        const method = String(init?.method ?? (typeof input === 'string' ? 'GET' : (input as Request).method ?? 'GET')).toUpperCase()
+        const urlStr = typeof input === 'string' ? input : (input as Request).url
+        let target: string = urlStr
+        if (method === 'GET' && urlStr.includes('/rest/v1/')) {
+          // profiles usa user_id como PK; demais tabelas usam id
+          const tableMatch = urlStr.match(/rest\/v1\/([a-z_]+)/)
+          const bustCol = tableMatch && tableMatch[1] === 'profiles' ? 'user_id' : 'id'
+          const bust = `${bustCol}=not.eq.${Math.random().toString(36).slice(2, 14)}${Date.now().toString(36)}`
+          target = urlStr + (urlStr.includes('?') ? '&' : '?') + bust
+        }
         const headers =
           init && init.headers
             ? init.headers instanceof Headers
@@ -72,7 +87,7 @@ function getSupabase(): SupabaseClient | null {
           const k = key.toLowerCase()
           if (k !== 'x-client-info' && k !== 'accept-profile') clean[k] = value
         })
-        return fetch(input as string, { ...init, headers: clean })
+        return fetch(target as any, { ...init, headers: clean } as any)
       } catch {
         return fetch(input as string, init)
       }
