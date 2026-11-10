@@ -31,6 +31,7 @@ import {
   RankingEntry,
   RankingCategory,
   AthleteCardData,
+  Laterality,
 } from '@/lib/types'
 
 // ---------------------------------------------------------------------------
@@ -367,9 +368,9 @@ export async function updateProfile(userId: string, data: Partial<Profile> & { n
   }
 
   let rawGoals = data.bio_goals !== undefined ? data.bio_goals : (current?.bio_goals || '')
-  const clean1 = extractAthleteMetaFromBio(rawGoals)?.cleanBio ?? rawGoals
+  const clean1 = extractAthleteMetaFromBio(rawGoals)?.cleanBio ?? rawGoals ?? ''
   const clean2 = extractTeamMetaFromBio(clean1)?.cleanBio ?? clean1
-  let finalBio = clean2.trim()
+  let finalBio = (clean2 ?? '').trim()
   if (existingTeam) {
     finalBio = `[TEAM:${JSON.stringify(existingTeam.team)}] ${finalBio}`.trim()
   }
