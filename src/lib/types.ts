@@ -64,6 +64,9 @@ export interface Profile {
   practice_time: string;
   serve_types: ServeType[];
   bio_goals?: string | null;
+  height?: number | null;
+  weight?: number | null;
+  wingspan?: number | null;
   show_weight: boolean;
   show_height: boolean;
   show_reach: boolean;

@@ -47,39 +47,14 @@ export default function Sidebar({ currentUser, isOpen, onClose }: SidebarProps) 
     }
   };
 
-  const navGroups: { label: string; items: { name: string; href: string; icon: React.ElementType }[] }[] = [
-    {
-      label: 'Pessoal',
-      items: [
-        { name: 'Início', href: '/dashboard', icon: Home },
-        { name: 'Meu perfil', href: '/perfil', icon: User },
-        { name: 'Ficha técnica', href: '/ficha', icon: FileText },
-        { name: 'Minhas avaliações', href: '/avaliacoes', icon: ClipboardList },
-        { name: 'Minha evolução', href: '/evolucao', icon: TrendingUp },
-        { name: 'Minhas metas', href: '/metas', icon: Target },
-        { name: 'Conquistas', href: '/conquistas', icon: Medal },
-        { name: 'Minha carteirinha', href: '/carteirinha', icon: CreditCard },
-      ],
-    },
-    {
-      label: 'Equipe',
-      items: [
-        { name: 'Time', href: '/time', icon: Users },
-        { name: 'Rankings', href: '/rankings', icon: Trophy },
-      ],
-    },
-    {
-      label: 'Ferramentas',
-      items: [
-        { name: 'Comparar atletas', href: '/comparar', icon: ArrowLeftRight },
-        { name: 'Relatórios', href: '/relatorios', icon: FileText },
-        { name: 'Configurações', href: '/configuracoes', icon: Settings },
-      ],
-    },
+  const navItems: { name: string; href: string; icon: React.ElementType }[] = [
+    { name: 'Início', href: '/dashboard', icon: Home },
+    { name: 'Meu perfil', href: '/perfil', icon: User },
+    { name: 'Nova avaliação', href: '/avaliacao', icon: PlusCircle },
+    { name: 'Minhas avaliações', href: '/avaliacoes', icon: ClipboardList },
+    { name: 'Time', href: '/time', icon: Users },
   ];
 
-  // Match exato no pathname para evitar falsos positivos entre rotas
-  // semelhantes (ex: /metas vs /configuracoes, /perfil vs /perfil/editar).
   const isItemActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
   return (
@@ -108,11 +83,11 @@ export default function Sidebar({ currentUser, isOpen, onClose }: SidebarProps) 
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="font-black text-lg tracking-wider text-emerald-400">VOLLEY</span>
-                <span className="font-black text-lg tracking-wider text-white">PERFORMANCE</span>
+                <span className="font-black text-xl tracking-wider text-white">TIME</span>
+                <span className="font-black text-xl tracking-wider text-emerald-400">IFAL</span>
               </div>
-              <p className="text-[10px] tracking-widest text-emerald-500/70 font-semibold uppercase">
-                Time IFAL · Vôlei de Alto Rendimento
+              <p className="text-[10px] tracking-widest text-emerald-500/80 font-bold uppercase">
+                Vôlei de Alto Rendimento
               </p>
             </div>
           </Link>
@@ -130,42 +105,38 @@ export default function Sidebar({ currentUser, isOpen, onClose }: SidebarProps) 
           </Link>
         </div>
 
-        {/* Navigation Items */}
-        <div className="flex-1 px-4 py-4 space-y-4 overflow-y-auto">
-          {navGroups.map((group) => (
-            <div key={group.label} className="space-y-1.5">
-              <p className="px-3 pb-1.5 text-[11px] font-bold tracking-wider text-gray-500 uppercase">
-                {group.label}
-              </p>
-              {group.items.map((item) => {
-                const Icon = item.icon;
-                const isActive = isItemActive(item.href);
+        {/* Navigation Items (Menu Principal Simplificado) */}
+        <div className="flex-1 px-4 py-4 space-y-1.5 overflow-y-auto">
+          <p className="px-3 pb-1 text-[11px] font-bold tracking-wider text-gray-500 uppercase">
+            Menu Principal
+          </p>
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = isItemActive(item.href);
 
-                return (
-                  <Link
-                    key={item.name}
-                    href={item.href}
-                    onClick={onClose}
-                    className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all group ${
-                      isActive
-                        ? 'bg-emerald-950/60 text-emerald-300 border border-emerald-500/40 shadow-[0_0_15px_rgba(0,230,118,0.15)] font-semibold'
-                        : 'text-gray-400 hover:text-white hover:bg-white/[0.04] border border-transparent'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Icon className={`w-5 h-5 transition-colors ${
-                        isActive ? 'text-emerald-400' : 'text-gray-500 group-hover:text-emerald-400'
-                      }`} />
-                      <span>{item.name}</span>
-                    </div>
-                    {isActive && (
-                      <div className="w-1.5 h-4 rounded-full bg-emerald-400 shadow-neon" />
-                    )}
-                  </Link>
-                );
-              })}
-            </div>
-          ))}
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                onClick={onClose}
+                className={`flex items-center justify-between px-3.5 py-3 rounded-xl text-sm font-medium transition-all group ${
+                  isActive
+                    ? 'bg-emerald-950/60 text-emerald-300 border border-emerald-500/40 shadow-[0_0_15px_rgba(0,230,118,0.15)] font-semibold'
+                    : 'text-gray-400 hover:text-white hover:bg-white/[0.04] border border-transparent'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Icon className={`w-5 h-5 transition-colors ${
+                    isActive ? 'text-emerald-400' : 'text-gray-500 group-hover:text-emerald-400'
+                  }`} />
+                  <span>{item.name}</span>
+                </div>
+                {isActive && (
+                  <div className="w-1.5 h-4 rounded-full bg-emerald-400 shadow-neon" />
+                )}
+              </Link>
+            );
+          })}
         </div>
 
         {/* User Card & Logout */}

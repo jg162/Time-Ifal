@@ -107,7 +107,7 @@ export default function AvaliacoesPage() {
           onToggleSidebar={() => setSidebarOpen(true)}
           currentUser={user}
           title="Minhas Avaliações"
-          subtitle="Histórico completo e análise comparativa de evolução"
+          subtitle="TIME IFAL · Histórico completo de testes físicos e impulsão"
         />
 
         <main className="p-4 sm:p-6 lg:p-8 space-y-8 max-w-7xl mx-auto w-full">
@@ -198,7 +198,7 @@ export default function AvaliacoesPage() {
                       </div>
 
                       {/* Middle: Measurements Grid */}
-                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 flex-1 text-xs">
+                      <div className="grid grid-cols-2 sm:grid-cols-6 gap-2.5 flex-1 text-xs">
                         {/* Altura */}
                         <div className="p-2.5 rounded-xl bg-[#080d0a] border border-emerald-950/80">
                           <span className="text-[10px] text-gray-500 uppercase block font-semibold">Altura</span>
@@ -213,6 +213,12 @@ export default function AvaliacoesPage() {
                           </span>
                         </div>
 
+                        {/* Envergadura */}
+                        <div className="p-2.5 rounded-xl bg-[#080d0a] border border-emerald-950/80">
+                          <span className="text-[10px] text-gray-500 uppercase block font-semibold">Envergadura</span>
+                          <span className="font-mono font-bold text-white text-sm">{ev.wingspan} cm</span>
+                        </div>
+
                         {/* Alcance Parado */}
                         <div className="p-2.5 rounded-xl bg-[#080d0a] border border-emerald-950/80">
                           <span className="text-[10px] text-gray-500 uppercase block font-semibold">Alcance Parado</span>
@@ -222,7 +228,7 @@ export default function AvaliacoesPage() {
                         {/* Alcance Pulando */}
                         <div className="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/30">
                           <span className="text-[10px] text-emerald-400 uppercase block font-bold flex items-center gap-1">
-                            <Zap className="w-2.5 h-2.5" /> Alcance Pulando
+                            <Zap className="w-2.5 h-2.5" /> Alcance Salto
                           </span>
                           <span className="font-mono font-extrabold text-emerald-300 text-sm">
                             {ev.reach_jumping} cm
@@ -230,7 +236,7 @@ export default function AvaliacoesPage() {
                         </div>
 
                         {/* Salto Vertical */}
-                        <div className="p-2.5 rounded-xl bg-[#080d0a] border border-emerald-950/80">
+                        <div className="p-2.5 rounded-xl bg-[#080d0a] border border-sky-500/30">
                           <span className="text-[10px] text-sky-400 uppercase block font-semibold">Salto Líquido</span>
                           <span className="font-mono font-black text-sky-300 text-sm">
                             +{ev.vertical_jump} cm

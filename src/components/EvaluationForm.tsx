@@ -23,6 +23,9 @@ interface EvaluationFormProps {
   initialData?: {
     full_name?: string;
     birth_date?: string;
+    height?: number | null;
+    weight?: number | null;
+    wingspan?: number | null;
     position?: Position;
     serve_types?: ServeType[];
     goals?: string;
@@ -41,11 +44,11 @@ export default function EvaluationForm({ initialData, onSuccess }: EvaluationFor
   const [evaluationDate, setEvaluationDate] = useState<string>(todayStr);
   const [fullName, setFullName] = useState<string>(initialData?.full_name || '');
   const [birthDate, setBirthDate] = useState<string>(initialData?.birth_date || '');
-  const [weight, setWeight] = useState<string>('');
-  const [height, setHeight] = useState<string>('');
+  const [weight, setWeight] = useState<string>(initialData?.weight != null ? String(initialData.weight) : '');
+  const [height, setHeight] = useState<string>(initialData?.height != null ? String(initialData.height) : '');
   const [reachStanding, setReachStanding] = useState<string>('');
   const [reachJumping, setReachJumping] = useState<string>('');
-  const [wingspan, setWingspan] = useState<string>('');
+  const [wingspan, setWingspan] = useState<string>(initialData?.wingspan != null ? String(initialData.wingspan) : '');
   const [seatedHeight, setSeatedHeight] = useState<string>('');
   const [attackReach, setAttackReach] = useState<string>('');
   const [blockReach, setBlockReach] = useState<string>('');

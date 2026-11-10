@@ -90,6 +90,9 @@ export default function AvaliacaoPage() {
             initialData={{
               full_name: profile?.full_name || user?.name || '',
               birth_date: profile?.birth_date || '',
+              height: profile?.height,
+              weight: profile?.weight,
+              wingspan: profile?.wingspan,
               position: profile?.preferred_position || 'Ponteiro',
               serve_types: profile?.serve_types || ['Flutuante pulando'],
               goals: profile?.bio_goals || '',

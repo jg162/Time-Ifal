@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'VOLLEY PERFORMANCE · TIME IFAL | Avaliação de Atletas de Voleibol',
-  description: 'Sistema completo e moderno para avaliação física, acompanhamento de evolução e análise técnica de atletas de voleibol.',
+  title: 'TIME IFAL | Plataforma de Avaliação e Acompanhamento Esportivo',
+  description: 'Plataforma de avaliação física e acompanhamento esportivo de atletas de vôlei do IFAL.',
 };
 
 export default function RootLayout({

@@ -229,7 +229,7 @@ export default function ConfiguracoesPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `volley-performance-time-ifal-avaliacoes-${user?.name?.toLowerCase().replace(/\s+/g, '-') || 'atleta'}.json`;
+    a.download = `time-ifal-avaliacoes-${user?.name?.toLowerCase().replace(/\s+/g, '-') || 'atleta'}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };

@@ -216,7 +216,7 @@ export default function FichaTecnicaPage() {
                     </span>
                   </div>
                   <p className="text-xs sm:text-sm text-gray-300 print:text-gray-700 font-medium">
-                    TIME IFAL · VOLLEY PERFORMANCE · VOLEIBOL DE ALTO RENDIMENTO
+                    TIME IFAL · VOLEIBOL DE ALTO RENDIMENTO
                   </p>
                   <p className="text-xs text-gray-400 print:text-gray-500 mt-1">
                     Última avaliação oficial: {latestEval?.evaluation_date ? new Date(latestEval.evaluation_date + 'T00:00:00').toLocaleDateString('pt-BR') : 'Sem avaliações'}
@@ -419,7 +419,7 @@ export default function FichaTecnicaPage() {
 
             {/* Assinatura / Rodapé da Ficha */}
             <div className="pt-8 border-t border-emerald-950/80 print:border-gray-300 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-gray-500 print:text-gray-600">
-              <p>VOLLEY PERFORMANCE · IFAL Campus Maceió · Certificação Eletrônica de Avaliação Física</p>
+              <p>TIME IFAL · IFAL Campus Maceió · Certificação Eletrônica de Avaliação Física</p>
               <div className="print:block hidden text-right">
                 <p>Assinatura do Atleta: ___________________________</p>
               </div>

@@ -25,8 +25,8 @@ export async function generateMetadata({ params }: CartaoPageProps): Promise<Met
   const data = await getPublicCardBySlug(params.slug);
   return {
     title: data
-      ? `${data.name} • Carteirinha TIME IFAL · VOLLEY PERFORMANCE`
-      : 'Carteirinha pública • TIME IFAL · VOLLEY PERFORMANCE',
+      ? `${data.name} • Carteirinha TIME IFAL`
+      : 'Carteirinha pública • TIME IFAL',
   };
 }
 
@@ -79,7 +79,7 @@ export default async function CartaoPublicoPage({ params }: CartaoPageProps) {
             <div className="flex items-center gap-2 min-w-0">
               <CreditCard className="w-5 h-5 text-emerald-400 shrink-0" />
               <span className="text-xs sm:text-sm font-black uppercase tracking-[0.25em] text-emerald-400 truncate">
-                Volley Performance
+                TIME IFAL
               </span>
             </div>
             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-950/70 text-emerald-300 border border-emerald-400/50 text-[10px] sm:text-xs font-black uppercase tracking-wider whitespace-nowrap">
@@ -160,7 +160,7 @@ export default async function CartaoPublicoPage({ params }: CartaoPageProps) {
 
         {/* Rodapé discreto */}
         <p className="text-center text-[11px] text-gray-500">
-          Carteirinha pública de atleta • TIME IFAL · VOLLEY PERFORMANCE ·{' '}
+          Carteirinha pública de atleta • TIME IFAL ·{' '}
           <Link
             href="/login"
             className="text-emerald-400 hover:text-emerald-300 font-semibold transition-colors"

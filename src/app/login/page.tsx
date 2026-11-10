@@ -68,11 +68,11 @@ export default function LoginPage() {
             </div>
             <div className="text-left">
               <div className="flex items-center gap-1.5">
-                <span className="font-black text-2xl tracking-wider text-white">VOLLEY</span>
-                <span className="font-black text-2xl tracking-wider text-emerald-400">PERFORMANCE</span>
+                <span className="font-black text-2xl tracking-wider text-white">TIME</span>
+                <span className="font-black text-2xl tracking-wider text-emerald-400">IFAL</span>
               </div>
               <p className="text-[10px] tracking-widest text-emerald-500/80 font-bold uppercase">
-                Time IFAL · Vôlei de Alto Rendimento
+                Vôlei de Alto Rendimento
               </p>
             </div>
           </Link>

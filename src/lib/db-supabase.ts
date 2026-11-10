@@ -1,5 +1,5 @@
 /**
- * Camada de dados PostgreSQL/Supabase para a plataforma VOLLEY PERFORMANCE.
+ * Camada de dados PostgreSQL/Supabase para a plataforma TIME IFAL.
  *
  * Todas as funções espelham a API de src/lib/db.ts (SQLite) para que as rotas
  * de API e páginas funcionem sem alterações. Quando as env vars do Supabase
@@ -91,6 +91,9 @@ function toProfile(row: any): Profile {
     practice_time: row.practice_time ?? '',
     serve_types: Array.isArray(row.serve_types) ? row.serve_types : JSON.parse(row.serve_types || '[]'),
     bio_goals: row.bio_goals ?? null,
+    height: row.height !== undefined ? row.height : null,
+    weight: row.weight !== undefined ? row.weight : null,
+    wingspan: row.wingspan !== undefined ? row.wingspan : null,
     show_weight: Boolean(row.show_weight),
     show_height: Boolean(row.show_height),
     show_reach: Boolean(row.show_reach),
@@ -266,6 +269,9 @@ export async function updateProfile(userId: string, data: Partial<Profile> & { n
     practice_time: data.practice_time !== undefined ? data.practice_time : current.practice_time,
     serve_types: data.serve_types ? data.serve_types : current.serve_types,
     bio_goals: mergedBio,
+    height: data.height !== undefined ? data.height : current.height,
+    weight: data.weight !== undefined ? data.weight : current.weight,
+    wingspan: data.wingspan !== undefined ? data.wingspan : current.wingspan,
     show_weight: data.show_weight !== undefined ? data.show_weight : current.show_weight,
     show_height: data.show_height !== undefined ? data.show_height : current.show_height,
     show_reach: data.show_reach !== undefined ? data.show_reach : current.show_reach,
@@ -340,6 +346,9 @@ export async function createEvaluation(evalData: Omit<Evaluation, 'created_at'>)
       practice_time: evalData.practice_time || '',
       serve_types: evalData.serve_types,
       bio_goals: evalData.goals,
+      height: evalData.height,
+      weight: evalData.weight,
+      wingspan: evalData.wingspan,
       updated_at: now,
     }).eq('user_id', evalData.user_id)
   } catch (err) {

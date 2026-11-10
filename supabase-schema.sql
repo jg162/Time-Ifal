@@ -29,6 +29,9 @@ CREATE TABLE IF NOT EXISTS profiles (
   practice_time TEXT DEFAULT '',
   serve_types JSONB NOT NULL DEFAULT '[]'::jsonb,
   bio_goals TEXT DEFAULT '',
+  height NUMERIC,
+  weight NUMERIC,
+  wingspan NUMERIC,
   show_weight BOOLEAN NOT NULL DEFAULT true,
   show_height BOOLEAN NOT NULL DEFAULT true,
   show_reach BOOLEAN NOT NULL DEFAULT true,
@@ -154,8 +157,12 @@ CREATE POLICY "evaluations_public_read" ON evaluations FOR SELECT USING (true);
 CREATE POLICY "goals_public_read" ON goals FOR SELECT USING (true);
 CREATE POLICY "achievements_public_read" ON achievements FOR SELECT USING (true);
 
--- --------------------------------------------------------
--- Comentários (documentação)
+-- Migrações idempotentes para instalações existentes
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS height NUMERIC;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS weight NUMERIC;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS wingspan NUMERIC;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS team_id TEXT;
+
 -- --------------------------------------------------------
 COMMENT ON TABLE users IS 'Contas de atletas (senhas nunca em texto claro).';
 COMMENT ON TABLE profiles IS 'Dados pessoais e toggles de privacidade (LGPD).';

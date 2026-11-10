@@ -66,6 +66,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'O nome do time deve ter no mínimo 2 caracteres.' }, { status: 400 });
     }
 
+    const existingTeam = await getUserTeam(currentUser.id);
+    if (existingTeam) {
+      return NextResponse.json(
+        { error: `Você já está vinculado ao time "${existingTeam.name}". Saia da sua equipe atual antes de criar uma nova.` },
+        { status: 400 }
+      );
+    }
+
     const team = await createTeam(name.trim(), description || '', currentUser.id);
     const appUrl = getAppUrl(request);
     const inviteLink = `${appUrl}/cadastro?team=${team.code}`;

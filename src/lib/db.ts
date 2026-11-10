@@ -1,5 +1,5 @@
 /**
- * Camada de dados unificada da plataforma VOLLEY PERFORMANCE.
+ * Camada de dados unificada da plataforma TIME IFAL.
  *
  * Modo de operação:
  * - Se NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY estiverem

@@ -185,6 +185,9 @@ function initTables(db: Database.Database) {
   addColumnIfMissing(db, 'profiles', 'public_card_enabled', 'INTEGER NOT NULL DEFAULT 0');
   addColumnIfMissing(db, 'profiles', 'public_card_slug', 'TEXT');
   addColumnIfMissing(db, 'profiles', 'team_id', 'TEXT');
+  addColumnIfMissing(db, 'profiles', 'height', 'REAL');
+  addColumnIfMissing(db, 'profiles', 'weight', 'REAL');
+  addColumnIfMissing(db, 'profiles', 'wingspan', 'REAL');
 
   addColumnIfMissing(db, 'evaluations', 'seated_height', 'REAL');
   addColumnIfMissing(db, 'evaluations', 'attack_reach', 'REAL');
@@ -322,6 +325,9 @@ export function getProfileByUserId(userId: string): Profile | null {
     practice_time: row.practice_time ?? '',
     serve_types: JSON.parse(row.serve_types || '[]'),
     bio_goals: row.bio_goals,
+    height: row.height ?? null,
+    weight: row.weight ?? null,
+    wingspan: row.wingspan ?? null,
     show_weight: Boolean(row.show_weight),
     show_height: Boolean(row.show_height),
     show_reach: Boolean(row.show_reach),
@@ -362,6 +368,9 @@ export function updateProfile(userId: string, data: Partial<Profile> & { name?: 
       practice_time: data.practice_time !== undefined ? data.practice_time : current.practice_time,
       serve_types: data.serve_types ? JSON.stringify(data.serve_types) : JSON.stringify(current.serve_types),
       bio_goals: data.bio_goals !== undefined ? data.bio_goals : current.bio_goals,
+      height: data.height !== undefined ? data.height : current.height,
+      weight: data.weight !== undefined ? data.weight : current.weight,
+      wingspan: data.wingspan !== undefined ? data.wingspan : current.wingspan,
       show_weight: data.show_weight !== undefined ? toInt(data.show_weight) : toInt(current.show_weight),
       show_height: data.show_height !== undefined ? toInt(data.show_height) : toInt(current.show_height),
       show_reach: data.show_reach !== undefined ? toInt(data.show_reach) : toInt(current.show_reach),
@@ -385,6 +394,9 @@ export function updateProfile(userId: string, data: Partial<Profile> & { name?: 
           practice_time = ?,
           serve_types = ?,
           bio_goals = ?,
+          height = ?,
+          weight = ?,
+          wingspan = ?,
           show_weight = ?,
           show_height = ?,
           show_reach = ?,
@@ -404,6 +416,9 @@ export function updateProfile(userId: string, data: Partial<Profile> & { name?: 
       updated.practice_time,
       updated.serve_types,
       updated.bio_goals,
+      updated.height ?? null,
+      updated.weight ?? null,
+      updated.wingspan ?? null,
       updated.show_weight,
       updated.show_height,
       updated.show_reach,
@@ -482,6 +497,9 @@ export function createEvaluation(evalData: Omit<Evaluation, 'created_at'>): Eval
           practice_time = ?,
           serve_types = ?,
           bio_goals = ?,
+          height = ?,
+          weight = ?,
+          wingspan = ?,
           updated_at = ?
       WHERE user_id = ?
     `).run(
@@ -492,6 +510,9 @@ export function createEvaluation(evalData: Omit<Evaluation, 'created_at'>): Eval
       evalData.practice_time || '',
       JSON.stringify(evalData.serve_types),
       evalData.goals,
+      evalData.height,
+      evalData.weight,
+      evalData.wingspan,
       now,
       evalData.user_id
     );

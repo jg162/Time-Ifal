@@ -99,7 +99,7 @@ export default function RelatoriosPage() {
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(15);
-    doc.text('VOLLEY PERFORMANCE · TIME IFAL', 14, 12);
+    doc.text('TIME IFAL', 14, 12);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
     doc.setTextColor(160, 235, 195);
@@ -152,7 +152,7 @@ export default function RelatoriosPage() {
       doc.setFontSize(7.5);
       doc.setTextColor(...GRAY_TEXT);
       doc.text(
-        `Gerado automaticamente pela plataforma VOLLEY PERFORMANCE · TIME IFAL em ${new Date().toLocaleDateString('pt-BR')}`,
+        `Gerado automaticamente pela plataforma TIME IFAL em ${new Date().toLocaleDateString('pt-BR')}`,
         14,
         H - 5.5
       );

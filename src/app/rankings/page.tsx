@@ -200,7 +200,7 @@ export default function RankingsPage() {
               <div className="flex items-center gap-2 mb-1">
                 <Flame className="w-5 h-5 text-emerald-400" />
                 <h2 className="text-xl sm:text-2xl font-black text-white uppercase tracking-wide">
-                  Ranking VOLLEY PERFORMANCE · TIME IFAL
+                  Ranking Oficial · TIME IFAL
                 </h2>
               </div>
               <p className="text-xs sm:text-sm text-gray-300">

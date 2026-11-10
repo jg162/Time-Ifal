@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
-import { getProfileByUserId, getEvaluationsByUserId } from '@/lib/db';
+import { getProfileByUserId, getEvaluationsByUserId, getUserTeam } from '@/lib/db';
 import { ensureSeedData } from '@/lib/seed';
 
 export const dynamic = 'force-dynamic';
@@ -16,12 +16,14 @@ export async function GET(request: NextRequest) {
     const profile = await getProfileByUserId(user.id);
     const evaluations = await getEvaluationsByUserId(user.id);
     const latestEvaluation = evaluations.length > 0 ? evaluations[evaluations.length - 1] : null;
+    const team = await getUserTeam(user.id);
 
     return NextResponse.json({
       authenticated: true,
       user,
       profile,
       latestEvaluation,
+      team,
       evaluationsCount: evaluations.length,
     });
   } catch (err: any) {

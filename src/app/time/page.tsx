@@ -337,7 +337,7 @@ export default function TimePage() {
           onToggleSidebar={() => setSidebarOpen(true)}
           currentUser={currentUser}
           title="Time"
-          subtitle="Área coletiva dos atletas do TIME IFAL · VOLLEY PERFORMANCE"
+          subtitle="TIME IFAL · Área coletiva dos atletas e gestão da equipe"
         />
 
         <main className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto w-full">
@@ -407,7 +407,7 @@ export default function TimePage() {
                       ENTRAR EM UM TIME
                     </h3>
                     <p className="text-sm text-gray-300 leading-relaxed">
-                      Já possui um código de convite enviado pelo seu capitão ou treinador? Digite o código para ingressar imediatamente no elenco.
+                      Já possui um código de convite da sua equipe? Digite o código para ingressar imediatamente no elenco.
                     </p>
                   </div>
                   <div className="mt-8 pt-4 border-t border-sky-950/80 flex items-center justify-between">
@@ -442,7 +442,20 @@ export default function TimePage() {
                     </div>
                     
                     <p className="text-xs sm:text-sm text-gray-300 flex flex-wrap items-center gap-x-3 gap-y-1">
-                      <span>Código de Convite: <strong className="font-mono text-emerald-300 font-bold text-sm">{team.code}</strong></span>
+                      <span className="flex items-center gap-1.5">
+                        Código de Convite: <strong className="font-mono text-emerald-300 font-bold text-sm">{team.code}</strong>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(team.code);
+                            alert(`Código ${team.code} copiado com sucesso!`);
+                          }}
+                          className="p-1 rounded bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-300 text-[10px] font-bold"
+                          title="Copiar código"
+                        >
+                          Copiar Código
+                        </button>
+                      </span>
                       <span>•</span>
                       <span>{athletes.length} Atleta{athletes.length !== 1 ? 's' : ''} no Elenco</span>
                       {team.description && (

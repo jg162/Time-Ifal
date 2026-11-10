@@ -191,7 +191,7 @@ export default function CarteirinhaPage() {
           onToggleSidebar={() => setSidebarOpen(true)}
           currentUser={user}
           title="Minha Carteirinha"
-          subtitle="Seu cartão de atleta TIME IFAL · VOLLEY PERFORMANCE"
+          subtitle="Seu cartão de atleta TIME IFAL"
         />
 
         <main className="p-4 sm:p-6 lg:p-8 space-y-8 max-w-5xl mx-auto w-full">
@@ -210,7 +210,7 @@ export default function CarteirinhaPage() {
               <div className="flex items-center gap-2">
                 <CreditCard className="w-5 h-5 text-emerald-400" />
                 <span className="text-xs sm:text-sm font-black uppercase tracking-[0.25em] text-emerald-400">
-                  Volley Performance
+                  TIME IFAL
                 </span>
               </div>
               <span className="font-mono text-xs text-gray-400 tracking-widest">
