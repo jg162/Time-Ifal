@@ -394,8 +394,18 @@ export async function updateProfile(userId: string, data: Partial<Profile> & { n
     current = await getProfileByUserId(userId)
   }
 
-  const existingMeta = current?.bio_goals ? extractAthleteMetaFromBio(current.bio_goals)?.meta : null
-  const existingTeam = current?.bio_goals ? extractTeamMetaFromBio(current.bio_goals) : null
+  // IMPORTANTE: current.bio_goals chega LIMPO (sem tags), pois getProfileByUserId
+  // retorna a bio sem as tags [TEAM:...]/[ATHLETE_META:...]. Extrair a tag do time
+  // a partir do valor limpo sempre dava null, e salvar o perfil apagava a tag do
+  // time — fazendo o atleta "sair" do time do nada. Por isso lemos a bio RAW direto
+  // do banco antes de montar o update.
+  let rawCurrentBio = current?.bio_goals || ''
+  try {
+    const { data: rawProf } = await sb.from('profiles').select('bio_goals').eq('user_id', userId).maybeSingle()
+    if (rawProf?.bio_goals) rawCurrentBio = rawProf.bio_goals
+  } catch {}
+  const existingMeta = rawCurrentBio ? extractAthleteMetaFromBio(rawCurrentBio)?.meta : null
+  const existingTeam = rawCurrentBio ? extractTeamMetaFromBio(rawCurrentBio) : null
 
   const newMeta: AthleteMeta = {
     height: data.height !== undefined ? data.height : (current?.height ?? existingMeta?.height ?? null),
@@ -406,7 +416,7 @@ export async function updateProfile(userId: string, data: Partial<Profile> & { n
     practice_time: data.practice_time !== undefined ? data.practice_time : (current?.practice_time ?? existingMeta?.practice_time ?? ''),
   }
 
-  let rawGoals = data.bio_goals !== undefined ? data.bio_goals : (current?.bio_goals || '')
+  let rawGoals = data.bio_goals !== undefined ? data.bio_goals : rawCurrentBio
   const clean1 = extractAthleteMetaFromBio(rawGoals)?.cleanBio ?? rawGoals ?? ''
   const clean2 = extractTeamMetaFromBio(clean1)?.cleanBio ?? clean1
   let finalBio = (clean2 ?? '').trim()
@@ -435,10 +445,13 @@ export async function updateProfile(userId: string, data: Partial<Profile> & { n
     updated_at: now,
   }
 
-  if (newMeta.height !== null && newMeta.height !== undefined) updates.height = newMeta.height
-  if (newMeta.weight !== null && newMeta.weight !== undefined) updates.weight = newMeta.weight
-  if (newMeta.wingspan !== null && newMeta.wingspan !== undefined) updates.wingspan = newMeta.wingspan
-  if (newMeta.avatar_url !== undefined) updates.avatar_url = newMeta.avatar_url
+  // NOTA (schema de produção): a tabela profiles no banco atual não possui as
+  // colunas height/weight/wingspan/avatar_url. Esses valores já são persistidos
+  // de forma confiável pela tag [ATHLETE_META:...] em bio_goals (preservada
+  // acima) e, no caso do avatar, também na tabela users. Por isso NÃO tentamos
+  // gravar essas colunas aqui — evita 4 tentativas com erro por salvamento.
+  // Se as colunas forem adicionadas no futuro (supabase-profiles-columns-migration.sql),
+  // o loop resiliente abaixo passa a gravá-las automaticamente.
 
   // Atualiza tabela users de forma segura
   const userUpdates: any = {}
@@ -692,16 +705,19 @@ export async function createTeam(name: string, description = '', createdByUserId
 
   // 2. Fallback resiliente: armazena tag no perfil do criador
   // Usado tanto como backup quanto como única estratégia se a tabela não existe
+  let persistedInFallback = false
   if (createdByUserId) {
     try {
       // Garantir que o perfil exista (upsert)
-      const { data: prof } = await sb.from('profiles').select('bio_goals, full_name').eq('user_id', createdByUserId).maybeSingle()
+      const { data: prof, error: profSelErr } = await sb.from('profiles').select('bio_goals, full_name').eq('user_id', createdByUserId).maybeSingle()
       const teamTag = `[TEAM:${JSON.stringify({ id, name: name.trim(), code, description: description.trim(), created_by: createdByUserId, created_at: now, role: 'capitao' })}]`
+
+      if (profSelErr) console.warn('createTeam profiles select error:', profSelErr.message)
 
       if (!prof) {
         // Perfil não existe ainda — criar com a tag
         const { data: userData } = await sb.from('users').select('name').eq('id', createdByUserId).maybeSingle()
-        await sb.from('profiles').insert({
+        const { error: profInsErr } = await sb.from('profiles').insert({
           user_id: createdByUserId,
           full_name: userData?.name || '',
           preferred_position: 'Ponteiro',
@@ -717,17 +733,27 @@ export async function createTeam(name: string, description = '', createdByUserId
           created_at: now,
           updated_at: now,
         })
+        if (profInsErr) {
+          console.warn('createTeam profiles insert error:', profInsErr.message)
+        } else {
+          persistedInFallback = true
+        }
       } else {
         const existingBio = extractTeamMetaFromBio(prof.bio_goals)?.cleanBio ?? (prof.bio_goals || '')
         const updatedBio = existingBio ? `${teamTag} ${existingBio}` : teamTag
-        await sb.from('profiles').update({ bio_goals: updatedBio }).eq('user_id', createdByUserId)
+        const { error: profUpdErr } = await sb.from('profiles').update({ bio_goals: updatedBio }).eq('user_id', createdByUserId)
+        if (profUpdErr) {
+          console.warn('createTeam profiles update error:', profUpdErr.message)
+        } else {
+          persistedInFallback = true
+        }
       }
     } catch (e: any) {
       console.error('createTeam profile fallback error:', e?.message)
-      // Se tudo falhar, lançamos exceção para o usuário saber
-      if (!insertedInTable) {
-        throw new Error('Não foi possível salvar os dados do time. Por favor, complete seu perfil antes de criar um time.')
-      }
+    }
+    // Se nenhuma estratégia persistiu os dados, avisamos o usuário
+    if (!insertedInTable && !persistedInFallback) {
+      throw new Error('Não foi possível salvar os dados do time. Por favor, complete seu perfil antes de criar um time.')
     }
   }
 
@@ -1086,6 +1112,11 @@ export async function getAllTeamAthletes(requestingUserId?: string, teamIdFilter
     const weight = latestEval?.weight ?? p?.weight ?? null
     const wingspan = latestEval?.wingspan ?? p?.wingspan ?? null
 
+    // IMPORTANTE: as toggles de privacidade do atleta são aplicadas de verdade.
+    // Antes os valores eram enviados crus e o objeto privacy vinha fixo em true,
+    // vazando peso/altura/alcance mesmo com privacidade ativada.
+    const bmiVisible = showWeight && showHeight
+
     result.push({
       id: u.id,
       name: p?.full_name || u.name,
@@ -1094,29 +1125,29 @@ export async function getAllTeamAthletes(requestingUserId?: string, teamIdFilter
       laterality: latestEval?.laterality || p?.laterality || null,
       birth_date: birthDate,
       age: computedAge,
-      height,
-      weight,
-      reach_standing: latestEval?.reach_standing ?? null,
-      reach_jumping: latestEval?.reach_jumping ?? null,
-      wingspan,
-      vertical_jump: latestEval?.vertical_jump ?? null,
-      attack_reach: latestEval?.attack_reach ?? null,
-      block_reach: latestEval?.block_reach ?? null,
-      bmi: latestEval?.bmi ?? (weight && height ? calculateBMI(weight, height) : null),
+      height: showHeight ? height : null,
+      weight: showWeight ? weight : null,
+      reach_standing: showReach ? (latestEval?.reach_standing ?? null) : null,
+      reach_jumping: showReach ? (latestEval?.reach_jumping ?? null) : null,
+      wingspan: showWingspan ? wingspan : null,
+      vertical_jump: showReach ? (latestEval?.vertical_jump ?? null) : null,
+      attack_reach: showReach ? (latestEval?.attack_reach ?? null) : null,
+      block_reach: showReach ? (latestEval?.block_reach ?? null) : null,
+      bmi: bmiVisible ? (latestEval?.bmi ?? (weight && height ? calculateBMI(weight, height) : null)) : null,
       serve_types: serveTypes,
       practice_time: p?.practice_time || latestEval?.practice_time || null,
-      goals: latestEval?.goals || displayGoals || null,
+      goals: showGoals ? (latestEval?.goals || displayGoals || null) : null,
       last_updated: latestEval?.evaluation_date || p?.updated_at || null,
       evaluations_count: evalCount,
       is_self: isSelf,
       team_id: targetTeamId,
       privacy: {
-        show_weight: true,
-        show_height: true,
-        show_reach: true,
-        show_wingspan: true,
-        show_goals: true,
-        show_evaluations: true,
+        show_weight: showWeight,
+        show_height: showHeight,
+        show_reach: showReach,
+        show_wingspan: showWingspan,
+        show_goals: showGoals,
+        show_evaluations: showEvaluations,
       },
     })
   }
@@ -1129,7 +1160,9 @@ export async function getAthleteDetails(athleteId: string, requestingUserId?: st
   const athlete = athletes.find(a => a.id === athleteId)
   if (!athlete) return null
 
-  const evaluations = await getEvaluationsByUserId(athleteId)
+  // Respeita a toggle show_evaluations do atleta (o próprio sempre vê o seu histórico)
+  const canSeeEvaluations = athlete.is_self || athlete.privacy?.show_evaluations !== false
+  const evaluations = canSeeEvaluations ? await getEvaluationsByUserId(athleteId) : []
   return { athlete, evaluations }
 }
 

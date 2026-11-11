@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   practice_time TEXT DEFAULT '',
   serve_types JSONB NOT NULL DEFAULT '[]'::jsonb,
   bio_goals TEXT DEFAULT '',
+  avatar_url TEXT,
   height NUMERIC,
   weight NUMERIC,
   wingspan NUMERIC,
